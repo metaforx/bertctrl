@@ -7,34 +7,40 @@
 #include "Adafruit_SGP30.h"
 #include "Adafruit_Si7021.h"
 #include "I2CScanner.h"
+#include "neopixel.h"
 
 Adafruit_Si7021 si = Adafruit_Si7021();
 Adafruit_SGP30 sgp;
 I2CScanner scanner;
 
+/* ======================= prototypes =============================== */
+
+uint32_t Wheel(byte WheelPos);
+uint8_t red(uint32_t c);
+uint8_t green(uint32_t c);
+uint8_t blue(uint32_t c);
+void colorWipe(uint32_t c, uint8_t wait);
+void rainbowFade2White(uint8_t wait, int rainbowLoops, int whiteLoops);
+
+// IMPORTANT: Set pixel COUNT, PIN and TYPE
+#define PIXEL_PIN D2
+#define PIXEL_COUNT 16
+#define PIXEL_TYPE WS2812B
+#define BRIGHTNESS 50 // 0 - 255
+
+Adafruit_NeoPixel strip(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
+
 void setup()
 {
   Serial.begin(9600);
-  Serial.println("SGP30 test");
   Serial.println("Si7021 test");
 
-  if (!sgp.begin())
-  {
-    Serial.println("Sensor not found :(");
-    while (1)
-      ;
-  }
   if (!si.begin())
   {
     Serial.println("Did not find Si7021 sensor!");
     while (1)
       ;
   }
-
-  Serial.print("Found SGP30 serial #");
-  Serial.print(sgp.serialnumber[0], HEX);
-  Serial.print(sgp.serialnumber[1], HEX);
-  Serial.println(sgp.serialnumber[2], HEX);
 
   if (scanner.begin())
   {
@@ -46,25 +52,20 @@ void setup()
     Serial.println("Failed to initialize I2C bus.");
   }
 
-  // If you have a baseline measurement from before you can assign it to start, to 'self-calibrate'
-  // sgp.setIAQBaseline(0x8E68, 0x8F41);  // Will vary for each sensor!
+  strip.setBrightness(BRIGHTNESS);
+  strip.begin();
+  strip.show(); // Initialize all pixels to 'off'
 }
 
 int counter = 0;
 void loop()
 {
 
-  if (!sgp.IAQmeasure())
-  {
-    Serial.println("Measurement failed");
-    return;
-  }
-  Serial.print("TVOC ");
-  Serial.print(sgp.TVOC);
-  Serial.print(" ppb\t");
-  Serial.print("eCO2 ");
-  Serial.print(sgp.eCO2);
-  Serial.println(" ppm");
+  colorWipe(strip.Color(255, 0, 0), 50);    // Red
+  colorWipe(strip.Color(0, 255, 0), 50);    // Green
+  colorWipe(strip.Color(0, 0, 255), 50);    // Blue
+  colorWipe(strip.Color(0, 0, 0, 255), 50); // White
+
   Serial.print("Humidity:    ");
   Serial.print(si.readHumidity(), 2);
   Serial.print("\tTemperature: ");
@@ -72,71 +73,83 @@ void loop()
   delay(100);
   delay(1000);
 
-  counter++;
-  if (counter == 30)
-  {
-    counter = 0;
+  rainbowFade2White(3, 3, 1);
+}
 
-    uint16_t TVOC_base, eCO2_base;
-    if (!sgp.getIAQBaseline(&eCO2_base, &TVOC_base))
-    {
-      Serial.println("Failed to get baseline readings");
-      return;
-    }
-    Serial.print("****Baseline values: eCO2: 0x");
-    Serial.print(eCO2_base, HEX);
-    Serial.print(" & TVOC: 0x");
-    Serial.println(TVOC_base, HEX);
+void colorWipe(uint32_t c, uint8_t wait)
+{
+  for (uint16_t i = 0; i < strip.numPixels(); i++)
+  {
+    strip.setPixelColor(i, c);
+    strip.show();
+    delay(wait);
   }
 }
 
-// #include "Particle.h"
-// #include "Wire.h"
+void rainbowFade2White(uint8_t wait, int rainbowLoops, int whiteLoops)
+{
+  float fadeMax = 100.0;
+  int fadeVal = 0;
+  uint32_t wheelVal;
+  int redVal, greenVal, blueVal;
 
-// void setup() {
-//     Serial.begin(9600);
-//     delay(1000); // Add a delay to ensure the serial connection is initialized
-//     Serial.println("I2C Scanner");
+  for (int k = 0; k < rainbowLoops; k++)
+  {
+    for (int j = 0; j < 256; j++)
+    { // 5 cycles of all colors on wheel
+      for (int i = 0; i < strip.numPixels(); i++)
+      {
+        wheelVal = Wheel(((i * 256 / strip.numPixels()) + j) & 255);
 
-//     Wire.begin();
-// }
+        redVal = red(wheelVal) * float(fadeVal / fadeMax);
+        greenVal = green(wheelVal) * float(fadeVal / fadeMax);
+        blueVal = blue(wheelVal) * float(fadeVal / fadeMax);
 
-// void loop() {
-//     byte error, address;
-//     int nDevices;
+        strip.setPixelColor(i, strip.Color(redVal, greenVal, blueVal));
+      }
 
-//     Serial.println("Scanning...");
+      // First loop, fade in!
+      if (k == 0 && fadeVal < fadeMax - 1)
+      {
+        fadeVal++;
+      }
+      // Last loop, fade out!
+      else if (k == rainbowLoops - 1 && j > 255 - fadeMax)
+      {
+        fadeVal--;
+      }
 
-//     nDevices = 0;
-//     for (address = 1; address < 127; address++) {
-//         // The i2c_scanner uses the return value of
-//         // the Write.endTransmission to see if
-//         // a device did acknowledge to the address.
-//         Wire.beginTransmission(address);
-//         error = Wire.endTransmission();
+      strip.show();
+      delay(wait);
+    }
+  }
+}
 
-//         if (error == 0) {
-//             Serial.print("I2C device found at address 0x");
-//             if (address < 16) {
-//                 Serial.print("0");
-//             }
-//             Serial.print(address, HEX);
-//             Serial.println("  !");
+uint32_t Wheel(byte WheelPos)
+{
+  WheelPos = 255 - WheelPos;
+  if (WheelPos < 85)
+  {
+    return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3, 0);
+  }
+  if (WheelPos < 170)
+  {
+    WheelPos -= 85;
+    return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3, 0);
+  }
+  WheelPos -= 170;
+  return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0, 0);
+}
 
-//             nDevices++;
-//         } else if (error == 4) {
-//             Serial.print("Unknown error at address 0x");
-//             if (address < 16) {
-//                 Serial.print("0");
-//             }
-//             Serial.println(address, HEX);
-//         }
-//     }
-//     if (nDevices == 0) {
-//         Serial.println("No I2C devices found\n");
-//     } else {
-//         Serial.println("done\n");
-//     }
-
-//     delay(5000); // Wait 5 seconds for the next scan
-// }
+uint8_t red(uint32_t c)
+{
+  return (c >> 8);
+}
+uint8_t green(uint32_t c)
+{
+  return (c >> 16);
+}
+uint8_t blue(uint32_t c)
+{
+  return (c);
+}
