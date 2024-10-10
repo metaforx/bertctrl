@@ -22,16 +22,22 @@ uint8_t blue(uint32_t c);
 void colorWipe(uint32_t c, uint8_t wait);
 void rainbowFade2White(uint8_t wait, int rainbowLoops, int whiteLoops);
 
-// IMPORTANT: Set pixel COUNT, PIN and TYPE
+// NEOPIXEL: Set pixel COUNT, PIN and TYPE
 #define PIXEL_PIN D2
 #define PIXEL_COUNT 16
 #define PIXEL_TYPE WS2812B
 #define BRIGHTNESS 50 // 0 - 255
-
 Adafruit_NeoPixel strip(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
+
+// RGB Rotary Encoder
+#define RGB_ROTARY_ENCODER_SW_PIN A3
+bool switchState = false;
+bool lastSwitchState = false;
 
 void setup()
 {
+  pinMode(RGB_ROTARY_ENCODER_SW_PIN, INPUT_PULLDOWN);
+
   Serial.begin(9600);
   Serial.println("Si7021 test");
 
@@ -60,7 +66,19 @@ void setup()
 int counter = 0;
 void loop()
 {
+  int readSwitchState = digitalRead(RGB_ROTARY_ENCODER_SW_PIN);
 
+  if (readSwitchState != lastSwitchState)
+  {
+    if (readSwitchState == HIGH)
+    {
+      switchState = !switchState;
+      Serial.println("Button toggled");
+    }
+    lastSwitchState = readSwitchState;
+  }
+
+  Serial.println("Button state: " + String(switchState));
   colorWipe(strip.Color(255, 0, 0), 50);    // Red
   colorWipe(strip.Color(0, 255, 0), 50);    // Green
   colorWipe(strip.Color(0, 0, 255), 50);    // Blue
@@ -70,8 +88,6 @@ void loop()
   Serial.print(si.readHumidity(), 2);
   Serial.print("\tTemperature: ");
   Serial.println(si.readTemperature(), 2);
-  delay(100);
-  delay(1000);
 
   rainbowFade2White(3, 3, 1);
 }
