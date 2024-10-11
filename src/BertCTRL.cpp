@@ -1,17 +1,11 @@
-// Example usage for Adafruit_SGP30 library.
-// This library was modified/wrapped by SJB (https://github.com/dyadica)
-// in order to work with Particle Photon & Core.
-
 #include "Particle.h"
 #include <Wire.h>
-#include "Adafruit_SGP30.h"
 #include "Adafruit_Si7021.h"
 #include "I2CScanner.h"
 #include "neopixel.h"
 #include <Encoder.h>
 
 Adafruit_Si7021 si = Adafruit_Si7021();
-Adafruit_SGP30 sgp;
 I2CScanner scanner;
 
 /* ======================= prototypes =============================== */
