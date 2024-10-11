@@ -8,6 +8,7 @@
 #include "Adafruit_Si7021.h"
 #include "I2CScanner.h"
 #include "neopixel.h"
+#include <Encoder.h>
 
 Adafruit_Si7021 si = Adafruit_Si7021();
 Adafruit_SGP30 sgp;
@@ -31,12 +32,23 @@ Adafruit_NeoPixel strip(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 
 // RGB Rotary Encoder
 #define RGB_ROTARY_ENCODER_SW_PIN A3
+#define RGB_ROTARY_ENCODER_B_PIN D3
+#define RGB_ROTARY_ENCODER_A_PIN D4
 bool switchState = false;
 bool lastSwitchState = false;
+
+int encPosition = 0;  // Keeps track of the encoder position
+int encLastState = 0; // Stores the last state of the encoder
+
+SYSTEM_MODE(SEMI_AUTOMATIC);
+Encoder myEnc(RGB_ROTARY_ENCODER_A_PIN, RGB_ROTARY_ENCODER_B_PIN);
 
 void setup()
 {
   pinMode(RGB_ROTARY_ENCODER_SW_PIN, INPUT_PULLDOWN);
+  pinMode(RGB_ROTARY_ENCODER_A_PIN, INPUT_PULLUP);
+  pinMode(RGB_ROTARY_ENCODER_B_PIN, INPUT_PULLUP);
+  encLastState = (digitalRead(RGB_ROTARY_ENCODER_A_PIN) << 1) | digitalRead(RGB_ROTARY_ENCODER_B_PIN);
 
   Serial.begin(9600);
   Serial.println("Si7021 test");
@@ -77,19 +89,33 @@ void loop()
     }
     lastSwitchState = readSwitchState;
   }
+  // int encStateA = digitalRead(RGB_ROTARY_ENCODER_A_PIN);
+  // int encStateB = digitalRead(RGB_ROTARY_ENCODER_B_PIN);
 
-  Serial.println("Button state: " + String(switchState));
-  colorWipe(strip.Color(255, 0, 0), 50);    // Red
-  colorWipe(strip.Color(0, 255, 0), 50);    // Green
-  colorWipe(strip.Color(0, 0, 255), 50);    // Blue
-  colorWipe(strip.Color(0, 0, 0, 255), 50); // White
+  // Serial.println("Enc states: " + String(encStateA) + "," + String(encStateB));
+  // Serial.println("Button state: " + String(switchState));
 
-  Serial.print("Humidity:    ");
-  Serial.print(si.readHumidity(), 2);
-  Serial.print("\tTemperature: ");
-  Serial.println(si.readTemperature(), 2);
+  long newPosition = myEnc.read();
+  if (newPosition != encLastState)
+  {
+    encLastState = newPosition;
+    Serial.println(newPosition);
+  }
 
-  rainbowFade2White(3, 3, 1);
+  // NEOPIXEL - TESTS
+  // colorWipe(strip.Color(255, 0, 0), 50);    // Red
+  // colorWipe(strip.Color(0, 255, 0), 50);    // Green
+  // colorWipe(strip.Color(0, 0, 255), 50);    // Blue
+  // colorWipe(strip.Color(0, 0, 0, 255), 50); // White
+  // rainbowFade2White(3, 3, 1);
+
+  // si7021 - Get humidity and temperature data
+  float humidity = si.readHumidity();
+  float temperature = si.readTemperature();
+  // Serial.print(si.readHumidity(), 2);
+  // Serial.print("\tTemperature: ");
+  // Serial.print("Humidity:    ");
+  // Serial.println(si.readTemperature(), 2);
 }
 
 void colorWipe(uint32_t c, uint8_t wait)
