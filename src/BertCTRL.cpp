@@ -31,18 +31,20 @@ Adafruit_NeoPixel strip(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 bool switchState = false;
 bool lastSwitchState = false;
 
-int encPosition = 0;  // Keeps track of the encoder position
-int encLastState = 0; // Stores the last state of the encoder
+int encPosition = 0;         // Keeps track of the encoder position
+int encLastState = 0;        // Stores the last state of the encoder
+const int maxPosition = 256; // Define the range (0-255)
+// const int stepsPerRevolution = 24; // Number of steps per full revolution
+Encoder rgbEnc(RGB_ROTARY_ENCODER_B_PIN, RGB_ROTARY_ENCODER_A_PIN);
 
 SYSTEM_MODE(SEMI_AUTOMATIC);
-Encoder myEnc(RGB_ROTARY_ENCODER_A_PIN, RGB_ROTARY_ENCODER_B_PIN);
 
 void setup()
 {
   pinMode(RGB_ROTARY_ENCODER_SW_PIN, INPUT_PULLDOWN);
   pinMode(RGB_ROTARY_ENCODER_A_PIN, INPUT_PULLUP);
   pinMode(RGB_ROTARY_ENCODER_B_PIN, INPUT_PULLUP);
-  encLastState = (digitalRead(RGB_ROTARY_ENCODER_A_PIN) << 1) | digitalRead(RGB_ROTARY_ENCODER_B_PIN);
+  encLastState = (digitalRead(RGB_ROTARY_ENCODER_B_PIN) << 1) | digitalRead(RGB_ROTARY_ENCODER_A_PIN);
 
   Serial.begin(9600);
   Serial.println("Si7021 test");
@@ -89,11 +91,13 @@ void loop()
   // Serial.println("Enc states: " + String(encStateA) + "," + String(encStateB));
   // Serial.println("Button state: " + String(switchState));
 
-  long newPosition = myEnc.read();
+  long newPosition = rgbEnc.read();
   if (newPosition != encLastState)
   {
+    int scaledPosition = newPosition % maxPosition;
     encLastState = newPosition;
-    Serial.println(newPosition);
+    Serial.print("Scaled Position: ");
+    Serial.println(scaledPosition);
   }
 
   // NEOPIXEL - TESTS
