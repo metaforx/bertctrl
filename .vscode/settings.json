@@ -8,7 +8,7 @@
         "unordered_map": "cpp",
         "cstdlib": "cpp"
     },
-    "particle.firmwareVersion": "3.3.0",
+    "particle.firmwareVersion": "3.3.1",
     "particle.targetDevice": "bertctrl",
     "particle.targetPlatform": "photon"
 }
