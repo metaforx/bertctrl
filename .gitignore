@@ -53,3 +53,6 @@ Thumbs.db
 *.su
 *.idb
 *.pdb
+.env
+src/wifi_creds.cpp
+.envrc

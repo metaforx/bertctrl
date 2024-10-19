@@ -3,6 +3,10 @@
 #include "Adafruit_Si7021.h"
 #include "I2CScanner.h"
 #include "neopixel.h"
+#include "wifi_creds.h"
+
+// // Define the array with a specific size in the .cpp file
+// credentials wifiCreds[1]; // Adjust the size as needed
 
 Adafruit_Si7021 si = Adafruit_Si7021();
 I2CScanner scanner;
@@ -26,9 +30,9 @@ uint32_t interpolateColor(uint32_t color1, uint32_t color2, float fraction);
 #define PIXEL_PIN D2
 #define PIXEL_COUNT 16
 #define PIXEL_TYPE WS2812B
-#define BRIGHTNESS 50 // 0 - 255
-#define FADE_STEPS 50 // Number of steps for the fade-in animation
-#define FADE_DELAY 2  // Delay between each fade step (in milliseconds)
+#define BRIGHTNESS 125 // 0 - 255
+#define FADE_STEPS 50  // Number of steps for the fade-in animation
+#define FADE_DELAY 2   // Delay between each fade step (in milliseconds)
 
 Adafruit_NeoPixel strip(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 
@@ -81,6 +85,7 @@ int previousHumidityLED = -1;                   // Track the previous humidityLE
 
 void clearLEDs();
 void fadeInPixel(int pixel, uint32_t color); // Function prototype
+void blinkLED(int pixel, uint32_t color, int times, int delayTime);
 
 String sensorStateString = "TEMPERATURE";
 int setSensorState(String command)
@@ -104,30 +109,51 @@ int setSensorState(String command)
 
 void setLEDColorBasedOnState(SensorState sensorState, int temperatureLED, int humidityLED)
 {
-  switch (sensorState)
+  // Check temperature conditions and set LED colors
+  if (currentTemperature < MIN_TEMPERATURE)
   {
-  case TEMPERATURE:
-    for (int i = 0; i < temperatureLED; i++)
-    {
-      float fraction = (float)i / strip.numPixels();
-      uint32_t color1 = 0x0000FF; // Blue
-      uint32_t color2 = 0xFF0000; // Red
-      uint32_t color = interpolateColor(color1, color2, fraction);
-      fadeInPixel(i, color);
-    }
-    break;
-  case HUMIDITY:
-    for (int i = 0; i < humidityLED; i++)
-    {
-      float fraction = (float)i / strip.numPixels();
-      uint32_t color1 = 0x00FFFF; // Green
-      uint32_t color2 = 0x0000FF; // Blue
-      uint32_t color = interpolateColor(color1, color2, fraction);
-      fadeInPixel(i, color);
-    }
-    break;
+    blinkLED(0, strip.Color(255, 0, 0), 3, 500); // Blink red on pixel 0
   }
-  strip.show();
+  else if (currentTemperature > MAX_TEMPERATURE)
+  {
+    blinkLED(15, strip.Color(255, 0, 0), 3, 500); // Blink red on pixel 15
+  }
+  else if (currentTemperature < MIN_TEMPERATURE + 3)
+  {
+    blinkLED(0, strip.Color(255, 165, 0), 3, 500); // Blink orange on pixel 0
+  }
+  else if (currentTemperature > MAX_TEMPERATURE - 3)
+  {
+    blinkLED(15, strip.Color(255, 165, 0), 3, 500); // Blink orange on pixel 15
+  }
+  else
+  {
+    // Normal operation: set LED colors based on state
+    switch (sensorState)
+    {
+    case TEMPERATURE:
+      for (int i = 0; i <= temperatureLED; i++)
+      {
+        float fraction = (float)i / strip.numPixels();
+        uint32_t color1 = 0x0000FF; // Blue
+        uint32_t color2 = 0x00FF00; // Green
+        uint32_t color = interpolateColor(color1, color2, fraction);
+        fadeInPixel(i, color);
+      }
+      break;
+    case HUMIDITY:
+      for (int i = 0; i <= humidityLED; i++)
+      {
+        float fraction = (float)i / strip.numPixels();
+        uint32_t color1 = 0x00FF00; // Green
+        uint32_t color2 = 0x0000FF; // Blue
+        uint32_t color = interpolateColor(color1, color2, fraction);
+        fadeInPixel(i, color);
+      }
+      break;
+    }
+    strip.show();
+  }
 }
 
 void fadeInPixel(int pixel, uint32_t color)
@@ -148,6 +174,19 @@ void fadeInPixel(int pixel, uint32_t color)
   }
 }
 
+void blinkLED(int pixel, uint32_t color, int times, int delayTime)
+{
+  for (int i = 0; i < times; i++)
+  {
+    strip.setPixelColor(pixel, color);
+    strip.show();
+    delay(delayTime);
+    strip.setPixelColor(pixel, 0); // Turn off the LED
+    strip.show();
+    delay(delayTime);
+  }
+}
+
 void clearLEDs()
 {
   for (int i = 0; i < strip.numPixels(); i++)
@@ -156,12 +195,46 @@ void clearLEDs()
   }
   strip.show();
 }
-
+SYSTEM_MODE(SEMI_AUTOMATIC);
+SYSTEM_THREAD(ENABLED);
 // SYSTEM_MODE(AUTOMATIC);
 // SYSTEM_THREAD(ENABLED);
+
+void setupWifi()
+{
+  credentials creds;
+  WiFi.on();
+  WiFi.disconnect();
+  WiFi.clearCredentials();
+
+  initWifiCredentials(); // Initialize credentials from environment variables
+
+  for (int i = 0; i < NUM_WIFI_CREDS; i++)
+  {
+    creds = wifiCreds[i];
+    if (creds.ssid && creds.password)
+    {
+      WiFi.setCredentials(creds.ssid, creds.password, creds.authType, creds.cipher);
+    }
+  }
+
+  WiFi.connect();
+  while (!WiFi.ready())
+  {
+    Serial.println("Connecting to WiFi...");
+    Serial.printlnf("Connecting to SSID: %s with Password: %s", creds.ssid, creds.password);
+    delay(1000);
+  }
+  Serial.println("Connected to WiFi");
+  Particle.connect();
+}
+
 void setup()
 {
   Serial.begin(9600);
+
+  setupWifi();
+
   Serial.println("Si7021 test");
 
   if (!si.begin())
