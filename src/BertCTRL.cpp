@@ -3,49 +3,164 @@
 #include "Adafruit_Si7021.h"
 #include "I2CScanner.h"
 #include "neopixel.h"
-#include <Encoder.h>
 
 Adafruit_Si7021 si = Adafruit_Si7021();
 I2CScanner scanner;
 
-/* ======================= prototypes =============================== */
+const int MAX_TEMPERATURE = 50;
+const int MIN_TEMPERATURE = 0;
+const int MAX_HUMIDITY = 100;
+const int MIN_HUMIDITY = 20;
+double currentTemperature = 0.0;
+double currentHumidity = 0.0;
 
-uint32_t Wheel(byte WheelPos);
+/* ======================= prototypes =============================== */
+// uint32_t Wheel(byte WheelPos);
 uint8_t red(uint32_t c);
 uint8_t green(uint32_t c);
 uint8_t blue(uint32_t c);
 void colorWipe(uint32_t c, uint8_t wait);
-void rainbowFade2White(uint8_t wait, int rainbowLoops, int whiteLoops);
+uint32_t interpolateColor(uint32_t color1, uint32_t color2, float fraction);
 
 // NEOPIXEL: Set pixel COUNT, PIN and TYPE
 #define PIXEL_PIN D2
 #define PIXEL_COUNT 16
 #define PIXEL_TYPE WS2812B
 #define BRIGHTNESS 50 // 0 - 255
+#define FADE_STEPS 50 // Number of steps for the fade-in animation
+#define FADE_DELAY 2  // Delay between each fade step (in milliseconds)
+
 Adafruit_NeoPixel strip(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 
-// RGB Rotary Encoder
-#define RGB_ROTARY_ENCODER_SW_PIN A3
-#define RGB_ROTARY_ENCODER_B_PIN D3
-#define RGB_ROTARY_ENCODER_A_PIN D4
-bool switchState = false;
-bool lastSwitchState = false;
+float clamp(float value, float min, float max)
+{
+  if (value < min)
+    return min;
+  if (value > max)
+    return max;
+  return value;
+}
 
-int encPosition = 0;         // Keeps track of the encoder position
-int encLastState = 0;        // Stores the last state of the encoder
-const int maxPosition = 256; // Define the range (0-255)
-// const int stepsPerRevolution = 24; // Number of steps per full revolution
-Encoder rgbEnc(RGB_ROTARY_ENCODER_B_PIN, RGB_ROTARY_ENCODER_A_PIN);
+float mapFloat(float x, float in_min, float in_max, float out_min, float out_max)
+{
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
 
-SYSTEM_MODE(SEMI_AUTOMATIC);
+int mapTemperatureToLED(float temperature)
+{
+  temperature = clamp(temperature, MIN_TEMPERATURE, MAX_TEMPERATURE);
+  int mappedValue = static_cast<int>(mapFloat(temperature, MIN_TEMPERATURE, MAX_TEMPERATURE, 0, strip.numPixels() - 1));
+  Serial.print("Temperature: ");
+  Serial.print(temperature);
+  Serial.print(" -> Mapped Temperature LED: ");
+  Serial.println(mappedValue);
+  return mappedValue;
+}
 
+int mapHumidityToLED(float humidity)
+{
+  humidity = clamp(humidity, MIN_HUMIDITY, MAX_HUMIDITY);
+  int mappedValue = static_cast<int>(mapFloat(humidity, MIN_HUMIDITY, MAX_HUMIDITY, 0, strip.numPixels() - 1));
+  Serial.print("Humidity: ");
+  Serial.print(humidity);
+  Serial.print(" -> Mapped Humidity LED: ");
+  Serial.println(mappedValue);
+  return mappedValue;
+}
+
+enum SensorState
+{
+  TEMPERATURE,
+  HUMIDITY,
+};
+
+volatile SensorState sensorState = TEMPERATURE; // Use volatile for variables shared with ISR
+SensorState previousSensorState = TEMPERATURE;  // Track the previous state
+int previousTemperatureLED = -1;                // Track the previous temperatureLED value
+int previousHumidityLED = -1;                   // Track the previous humidityLED value
+
+void clearLEDs();
+void fadeInPixel(int pixel, uint32_t color); // Function prototype
+
+String sensorStateString = "TEMPERATURE";
+int setSensorState(String command)
+{
+  int state = command.toInt(); // Convert the String argument to an integer
+  switch (state)
+  {
+  case 0:
+    sensorState = TEMPERATURE;
+    sensorStateString = "TEMPERATURE";
+    break;
+  case 1:
+    sensorState = HUMIDITY;
+    sensorStateString = "HUMIDITY";
+    break;
+  default:
+    return -1; // Invalid state
+  }
+  return 1; // Success
+}
+
+void setLEDColorBasedOnState(SensorState sensorState, int temperatureLED, int humidityLED)
+{
+  switch (sensorState)
+  {
+  case TEMPERATURE:
+    for (int i = 0; i < temperatureLED; i++)
+    {
+      float fraction = (float)i / strip.numPixels();
+      uint32_t color1 = 0x0000FF; // Blue
+      uint32_t color2 = 0xFF0000; // Red
+      uint32_t color = interpolateColor(color1, color2, fraction);
+      fadeInPixel(i, color);
+    }
+    break;
+  case HUMIDITY:
+    for (int i = 0; i < humidityLED; i++)
+    {
+      float fraction = (float)i / strip.numPixels();
+      uint32_t color1 = 0x00FFFF; // Green
+      uint32_t color2 = 0x0000FF; // Blue
+      uint32_t color = interpolateColor(color1, color2, fraction);
+      fadeInPixel(i, color);
+    }
+    break;
+  }
+  strip.show();
+}
+
+void fadeInPixel(int pixel, uint32_t color)
+{
+  uint8_t r = (color >> 16) & 0xFF;
+  uint8_t g = (color >> 8) & 0xFF;
+  uint8_t b = color & 0xFF;
+
+  for (int step = 0; step <= FADE_STEPS; step++)
+  {
+    float fraction = (float)step / FADE_STEPS;
+    uint8_t rStep = r * fraction;
+    uint8_t gStep = g * fraction;
+    uint8_t bStep = b * fraction;
+    strip.setPixelColor(pixel, strip.Color(rStep, gStep, bStep));
+    strip.show();
+    delay(FADE_DELAY);
+  }
+}
+
+void clearLEDs()
+{
+  for (int i = 0; i < strip.numPixels(); i++)
+  {
+    strip.setPixelColor(i, strip.Color(0, 0, 0)); // Turn off each LED
+  }
+  strip.show();
+}
+
+// SYSTEM_MODE(AUTOMATIC);
+// SYSTEM_THREAD(ENABLED);
 void setup()
 {
-  pinMode(RGB_ROTARY_ENCODER_SW_PIN, INPUT_PULLDOWN);
-  pinMode(RGB_ROTARY_ENCODER_A_PIN, INPUT_PULLUP);
-  pinMode(RGB_ROTARY_ENCODER_B_PIN, INPUT_PULLUP);
-  encLastState = (digitalRead(RGB_ROTARY_ENCODER_B_PIN) << 1) | digitalRead(RGB_ROTARY_ENCODER_A_PIN);
-
   Serial.begin(9600);
   Serial.println("Si7021 test");
 
@@ -68,128 +183,45 @@ void setup()
 
   strip.setBrightness(BRIGHTNESS);
   strip.begin();
-  strip.show(); // Initialize all pixels to 'off'
+  strip.show();
+  Particle.function("setSensorState", setSensorState); // Register the cloud function
+  Particle.variable("temperature", currentTemperature);
+  Particle.variable("humidity", currentHumidity);
+  Particle.variable("sensorState", sensorStateString);
 }
 
-int counter = 0;
 void loop()
 {
-  int readSwitchState = digitalRead(RGB_ROTARY_ENCODER_SW_PIN);
-
-  if (readSwitchState != lastSwitchState)
-  {
-    if (readSwitchState == HIGH)
-    {
-      switchState = !switchState;
-      Serial.println("Button toggled");
-    }
-    lastSwitchState = readSwitchState;
-  }
-  // int encStateA = digitalRead(RGB_ROTARY_ENCODER_A_PIN);
-  // int encStateB = digitalRead(RGB_ROTARY_ENCODER_B_PIN);
-
-  // Serial.println("Enc states: " + String(encStateA) + "," + String(encStateB));
-  // Serial.println("Button state: " + String(switchState));
-
-  long newPosition = rgbEnc.read();
-  if (newPosition != encLastState)
-  {
-    int scaledPosition = newPosition % maxPosition;
-    encLastState = newPosition;
-    Serial.print("Scaled Position: ");
-    Serial.println(scaledPosition);
-  }
-
-  // NEOPIXEL - TESTS
-  // colorWipe(strip.Color(255, 0, 0), 50);    // Red
-  // colorWipe(strip.Color(0, 255, 0), 50);    // Green
-  // colorWipe(strip.Color(0, 0, 255), 50);    // Blue
-  // colorWipe(strip.Color(0, 0, 0, 255), 50); // White
-  // rainbowFade2White(3, 3, 1);
-
   // si7021 - Get humidity and temperature data
-  float humidity = si.readHumidity();
-  float temperature = si.readTemperature();
-  // Serial.print(si.readHumidity(), 2);
-  // Serial.print("\tTemperature: ");
-  // Serial.print("Humidity:    ");
-  // Serial.println(si.readTemperature(), 2);
-}
+  currentHumidity = si.readHumidity();
+  currentTemperature = si.readTemperature();
+  int temperatureLED = mapTemperatureToLED(currentTemperature);
+  int humidityLED = mapHumidityToLED(currentHumidity);
 
-void colorWipe(uint32_t c, uint8_t wait)
-{
-  for (uint16_t i = 0; i < strip.numPixels(); i++)
+  // Check if the sensor state or LED values have changed
+  if (sensorState != previousSensorState || temperatureLED != previousTemperatureLED || humidityLED != previousHumidityLED)
   {
-    strip.setPixelColor(i, c);
-    strip.show();
-    delay(wait);
+    clearLEDs();
+    setLEDColorBasedOnState(sensorState, temperatureLED, humidityLED);
+    previousSensorState = sensorState;
+    previousTemperatureLED = temperatureLED;
+    previousHumidityLED = humidityLED;
   }
 }
 
-void rainbowFade2White(uint8_t wait, int rainbowLoops, int whiteLoops)
+uint32_t interpolateColor(uint32_t color1, uint32_t color2, float fraction)
 {
-  float fadeMax = 100.0;
-  int fadeVal = 0;
-  uint32_t wheelVal;
-  int redVal, greenVal, blueVal;
+  uint8_t r1 = (color1 >> 16) & 0xFF;
+  uint8_t g1 = (color1 >> 8) & 0xFF;
+  uint8_t b1 = color1 & 0xFF;
 
-  for (int k = 0; k < rainbowLoops; k++)
-  {
-    for (int j = 0; j < 256; j++)
-    { // 5 cycles of all colors on wheel
-      for (int i = 0; i < strip.numPixels(); i++)
-      {
-        wheelVal = Wheel(((i * 256 / strip.numPixels()) + j) & 255);
+  uint8_t r2 = (color2 >> 16) & 0xFF;
+  uint8_t g2 = (color2 >> 8) & 0xFF;
+  uint8_t b2 = color2 & 0xFF;
 
-        redVal = red(wheelVal) * float(fadeVal / fadeMax);
-        greenVal = green(wheelVal) * float(fadeVal / fadeMax);
-        blueVal = blue(wheelVal) * float(fadeVal / fadeMax);
+  uint8_t r = r1 + fraction * (r2 - r1);
+  uint8_t g = g1 + fraction * (g2 - g1);
+  uint8_t b = b1 + fraction * (b2 - b1);
 
-        strip.setPixelColor(i, strip.Color(redVal, greenVal, blueVal));
-      }
-
-      // First loop, fade in!
-      if (k == 0 && fadeVal < fadeMax - 1)
-      {
-        fadeVal++;
-      }
-      // Last loop, fade out!
-      else if (k == rainbowLoops - 1 && j > 255 - fadeMax)
-      {
-        fadeVal--;
-      }
-
-      strip.show();
-      delay(wait);
-    }
-  }
-}
-
-uint32_t Wheel(byte WheelPos)
-{
-  WheelPos = 255 - WheelPos;
-  if (WheelPos < 85)
-  {
-    return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3, 0);
-  }
-  if (WheelPos < 170)
-  {
-    WheelPos -= 85;
-    return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3, 0);
-  }
-  WheelPos -= 170;
-  return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0, 0);
-}
-
-uint8_t red(uint32_t c)
-{
-  return (c >> 8);
-}
-uint8_t green(uint32_t c)
-{
-  return (c >> 16);
-}
-uint8_t blue(uint32_t c)
-{
-  return (c);
+  return (r << 16) | (g << 8) | b;
 }
