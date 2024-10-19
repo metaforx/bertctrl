@@ -5,18 +5,24 @@
 #include "neopixel.h"
 #include "wifi_creds.h"
 
-// // Define the array with a specific size in the .cpp file
-// credentials wifiCreds[1]; // Adjust the size as needed
-
 Adafruit_Si7021 si = Adafruit_Si7021();
 I2CScanner scanner;
 
-const int MAX_TEMPERATURE = 50;
-const int MIN_TEMPERATURE = 0;
-const int MAX_HUMIDITY = 100;
+const int MAX_MAP_TEMPERATURE = 50;
+const int MIN_MAP_TEMPERATURE = 0;
+const int MAX_TEMPERATURE = 43;
+const int MIN_TEMPERATURE = 15;
+const int MAX_MAP_HUMIDITY = 100;
+const int MIN_MAP_HUMIDITY = 0;
+const int MAX_HUMIDITY = 70;
 const int MIN_HUMIDITY = 20;
 double currentTemperature = 0.0;
 double currentHumidity = 0.0;
+
+// custom utils
+bool isBelowMin(double value, double min);
+bool isAboveMax(double value, double min);
+uint32_t ALERT_COLOR = 0xFF0000; // Red
 
 /* ======================= prototypes =============================== */
 // uint32_t Wheel(byte WheelPos);
@@ -52,8 +58,8 @@ float mapFloat(float x, float in_min, float in_max, float out_min, float out_max
 
 int mapTemperatureToLED(float temperature)
 {
-  temperature = clamp(temperature, MIN_TEMPERATURE, MAX_TEMPERATURE);
-  int mappedValue = static_cast<int>(mapFloat(temperature, MIN_TEMPERATURE, MAX_TEMPERATURE, 0, strip.numPixels() - 1));
+  temperature = clamp(temperature, MIN_MAP_TEMPERATURE, MAX_MAP_TEMPERATURE);
+  int mappedValue = static_cast<int>(mapFloat(temperature, MIN_MAP_TEMPERATURE, MAX_MAP_TEMPERATURE, 0, strip.numPixels() - 1));
   Serial.print("Temperature: ");
   Serial.print(temperature);
   Serial.print(" -> Mapped Temperature LED: ");
@@ -63,8 +69,8 @@ int mapTemperatureToLED(float temperature)
 
 int mapHumidityToLED(float humidity)
 {
-  humidity = clamp(humidity, MIN_HUMIDITY, MAX_HUMIDITY);
-  int mappedValue = static_cast<int>(mapFloat(humidity, MIN_HUMIDITY, MAX_HUMIDITY, 0, strip.numPixels() - 1));
+  humidity = clamp(humidity, MIN_MAP_HUMIDITY, MAX_MAP_HUMIDITY);
+  int mappedValue = static_cast<int>(mapFloat(humidity, MIN_MAP_HUMIDITY, MAX_MAP_HUMIDITY, 0, strip.numPixels() - 1));
   Serial.print("Humidity: ");
   Serial.print(humidity);
   Serial.print(" -> Mapped Humidity LED: ");
@@ -109,51 +115,44 @@ int setSensorState(String command)
 
 void setLEDColorBasedOnState(SensorState sensorState, int temperatureLED, int humidityLED)
 {
-  // Check temperature conditions and set LED colors
-  if (currentTemperature < MIN_TEMPERATURE)
+
+  // Normal operation: set LED colors based on state
+  switch (sensorState)
   {
-    blinkLED(0, strip.Color(255, 0, 0), 3, 500); // Blink red on pixel 0
-  }
-  else if (currentTemperature > MAX_TEMPERATURE)
-  {
-    blinkLED(15, strip.Color(255, 0, 0), 3, 500); // Blink red on pixel 15
-  }
-  else if (currentTemperature < MIN_TEMPERATURE + 3)
-  {
-    blinkLED(0, strip.Color(255, 165, 0), 3, 500); // Blink orange on pixel 0
-  }
-  else if (currentTemperature > MAX_TEMPERATURE - 3)
-  {
-    blinkLED(15, strip.Color(255, 165, 0), 3, 500); // Blink orange on pixel 15
-  }
-  else
-  {
-    // Normal operation: set LED colors based on state
-    switch (sensorState)
+  case TEMPERATURE:
+    for (int i = 0; i <= temperatureLED; i++)
     {
-    case TEMPERATURE:
-      for (int i = 0; i <= temperatureLED; i++)
+      float fraction = (float)i / strip.numPixels();
+
+      uint32_t color1 = 0x0000FF; // Blue
+      uint32_t color2 = 0x00FF00; // Green
+      uint32_t color = interpolateColor(color1, color2, fraction);
+      if (isBelowMin(currentTemperature, MIN_TEMPERATURE + 5) && i == temperatureLED)
       {
-        float fraction = (float)i / strip.numPixels();
-        uint32_t color1 = 0x0000FF; // Blue
-        uint32_t color2 = 0x00FF00; // Green
-        uint32_t color = interpolateColor(color1, color2, fraction);
+        fadeInPixel(i, ALERT_COLOR);
+      }
+      else if (isAboveMax(currentTemperature, MAX_TEMPERATURE - 5) && i == temperatureLED)
+      {
+        fadeInPixel(i, ALERT_COLOR);
+      }
+      else
+      {
         fadeInPixel(i, color);
       }
-      break;
-    case HUMIDITY:
-      for (int i = 0; i <= humidityLED; i++)
-      {
-        float fraction = (float)i / strip.numPixels();
-        uint32_t color1 = 0x00FF00; // Green
-        uint32_t color2 = 0x0000FF; // Blue
-        uint32_t color = interpolateColor(color1, color2, fraction);
-        fadeInPixel(i, color);
-      }
-      break;
     }
-    strip.show();
+    break;
+  case HUMIDITY:
+    for (int i = 0; i <= humidityLED; i++)
+    {
+      float fraction = (float)i / strip.numPixels();
+      uint32_t color1 = 0x00FF00; // Green
+      uint32_t color2 = 0x0000FF; // Blue
+      uint32_t color = interpolateColor(color1, color2, fraction);
+      fadeInPixel(i, color);
+    }
+    break;
   }
+  strip.show();
 }
 
 void fadeInPixel(int pixel, uint32_t color)
@@ -229,6 +228,18 @@ void setupWifi()
   Particle.connect();
 }
 
+int setHumidity(String command)
+{
+  currentHumidity = command.toFloat();
+  return 1; // Success
+}
+
+int setTemperature(String command)
+{
+  currentTemperature = command.toFloat();
+  return 1; // Success
+}
+
 void setup()
 {
   Serial.begin(9600);
@@ -261,13 +272,19 @@ void setup()
   Particle.variable("temperature", currentTemperature);
   Particle.variable("humidity", currentHumidity);
   Particle.variable("sensorState", sensorStateString);
+
+  // Testing
+
+  // Register Particle functions
+  Particle.function("setHumidity", setHumidity);
+  Particle.function("setTemperature", setTemperature);
 }
 
 void loop()
 {
   // si7021 - Get humidity and temperature data
-  currentHumidity = si.readHumidity();
-  currentTemperature = si.readTemperature();
+  // currentHumidity = si.readHumidity();
+  // currentTemperature = si.readTemperature();
   int temperatureLED = mapTemperatureToLED(currentTemperature);
   int humidityLED = mapHumidityToLED(currentHumidity);
 
@@ -280,6 +297,17 @@ void loop()
     previousTemperatureLED = temperatureLED;
     previousHumidityLED = humidityLED;
   }
+}
+
+// Option 2: Separate Functions
+bool isBelowMin(double value, double min)
+{
+  return value < min;
+}
+
+bool isAboveMax(double value, double max)
+{
+  return value > max;
 }
 
 uint32_t interpolateColor(uint32_t color1, uint32_t color2, float fraction)
