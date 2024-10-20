@@ -7,14 +7,17 @@
 #include "SetupWifi.h"
 #include "ThingsboardClient.h"
 #include "NeopixelControls.h"
+#include "BertUtils.h"
 
 /* ======================= Init ==================================== */
 Adafruit_Si7021 si = Adafruit_Si7021();
 I2CScanner scanner;
 /* ================================================================= */
 
-/* ======================= Wifi ==================================== */
-// Defined in wifi_creds.cpp
+/* ======================= System & Wifi =========================== */
+SYSTEM_MODE(SEMI_AUTOMATIC);
+SYSTEM_THREAD(ENABLED);
+// Creds defined in wifi_creds.cpp
 /* ================================================================= */
 
 /* ======================= ThingsboardClient ======================= */
@@ -31,6 +34,7 @@ const int fadeSteps = 50;
 const int fadeDelay = 2;
 /* ================================================================= */
 
+/* ======================= TODO: clean up mess ===================== */
 const int MAX_MAP_TEMPERATURE = 50;
 const int MIN_MAP_TEMPERATURE = 0;
 const int MAX_TEMPERATURE = 43;
@@ -43,12 +47,9 @@ double currentTemperature = 0.0;
 double currentHumidity = 0.0;
 
 // custom utils
-bool isBelowMin(double value, double min);
-bool isAboveMax(double value, double min);
 uint32_t ALERT_COLOR = 0xFF0000; // Red
 
-/* ======================= prototypes =============================== */
-uint32_t interpolateColor(uint32_t color1, uint32_t color2, float fraction);
+
 
 // NEOPIXEL: Set pixel COUNT, PIN and TYPE
 #define PIXEL_PIN D2
@@ -59,20 +60,6 @@ uint32_t interpolateColor(uint32_t color1, uint32_t color2, float fraction);
 uint32_t currentPixelColors[PIXEL_COUNT];
 uint32_t temperatureDisplayColors[PIXEL_COUNT];
 Adafruit_NeoPixel strip(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
-
-float clamp(float value, float min, float max)
-{
-  if (value < min)
-    return min;
-  if (value > max)
-    return max;
-  return value;
-}
-
-float mapFloat(float x, float in_min, float in_max, float out_min, float out_max)
-{
-  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-}
 
 int mapTemperatureToLED(float temperature)
 {
@@ -127,11 +114,6 @@ void setLEDColorBasedOnState(SensorState sensorState, int temperatureLED, int hu
   case TEMPERATURE:
     for (int i = 0; i <= temperatureLED; i++)
     {
-      // float fraction = (float)i / strip.numPixels();
-
-      // uint32_t color1 = 0x0000FF; // Blue
-      // uint32_t color2 = 0x00FF00; // Green
-      // uint32_t color = interpolateColor(color1, color2, fraction);
       if (isBelowMin(currentTemperature, MIN_TEMPERATURE + 5) && i == temperatureLED)
       {
         fadeInPixel(i, ALERT_COLOR);
@@ -180,29 +162,14 @@ void setLEDColorBasedOnState(SensorState sensorState, int temperatureLED, int hu
   strip.show();
 }
 
-SYSTEM_MODE(SEMI_AUTOMATIC);
-SYSTEM_THREAD(ENABLED);
 
-int setHumidity(String command)
-{
-  currentHumidity = command.toFloat();
-  return 1; // Success
-}
-
-int setTemperature(String command)
-{
-  currentTemperature = command.toFloat();
-  return 1; // Success
-}
 
 void setup()
 {
   Serial.begin(9600);
-
   setupWifi();
 
   Serial.println("Si7021 test");
-
   if (!si.begin())
   {
     Serial.println("Did not find Si7021 sensor!");
@@ -220,46 +187,8 @@ void setup()
     Serial.println("Failed to initialize I2C bus.");
   }
 
-  // COLORS /// INTERPOLATION
-  uint32_t blue = 0x0000FF;   // Blue
-  uint32_t green = 0x00FF00;  // Green
-  uint32_t purple = 0x800080; // Purple
-  uint32_t red = 0xFF0000;    // Red
-
-  // Number of steps per segment
-  uint32_t segmentSteps = strip.numPixels() / 3;
-  uint32_t remainingSteps = strip.numPixels() % 3;
-
-  // Precompute the colors in the array
-  for (uint32_t step = 0; step < strip.numPixels(); step++)
-  {
-    float fraction;
-    uint32_t color;
-
-    if (step < segmentSteps)
-    {
-      // Interpolate from Blue to Green
-      fraction = static_cast<float>(step) / segmentSteps;
-      color = interpolateColor(blue, green, fraction);
-    }
-    else if (step < 2 * segmentSteps + remainingSteps)
-    {
-      // Interpolate from Green to Purple
-      fraction = static_cast<float>(step - segmentSteps) / segmentSteps;
-      color = interpolateColor(green, purple, fraction);
-    }
-    else
-    {
-      // Interpolate from Purple to Red
-      fraction = static_cast<float>(step - 2 * segmentSteps - remainingSteps) / segmentSteps;
-      color = interpolateColor(purple, red, fraction);
-    }
-
-    // Store the color in the array
-    temperatureDisplayColors[step] = color;
-  }
-  //////////////////////////
-
+  /* ======================= Color Setup ===========================================*/
+  precomputeColors();
   strip.setBrightness(BRIGHTNESS);
   strip.begin();
   for (int i = 0; i < PIXEL_COUNT; i++)
@@ -267,37 +196,42 @@ void setup()
     currentPixelColors[i] = strip.getPixelColor(i);
   }
   strip.show();
+  /* =============================================================================== */
+
+  /* ======================= Particle Functions ==================================== */
   Particle.function("setSensorState", setSensorState); // Register the cloud function
   Particle.variable("temperature", currentTemperature);
   Particle.variable("humidity", currentHumidity);
   Particle.variable("sensorState", sensorStateString);
 
   // Testing
-
-  // Register Particle functions
   // Particle.function("setHumidity", setHumidity);
   // Particle.function("setTemperature", setTemperature);
+  /* ================================================================================ */
 }
 
 void loop()
 {
-  // si7021 - Get humidity and temperature data
+  /* ======================= si7021 - Get Sensor Data ============================== */
   currentHumidity = si.readHumidity();
   currentTemperature = si.readTemperature();
+  /* =============================================================================== */
+
+  /* ======================= LED Display Mapped ==================================== */
   int temperatureLED = mapTemperatureToLED(currentTemperature);
   int humidityLED = mapHumidityToLED(currentHumidity);
 
   // Check if the sensor state or LED values have changed
   if (sensorState != previousSensorState || temperatureLED != previousTemperatureLED || humidityLED != previousHumidityLED)
   {
-    // clearLEDs();
     setLEDColorBasedOnState(sensorState, temperatureLED, humidityLED);
     previousSensorState = sensorState;
     previousTemperatureLED = temperatureLED;
     previousHumidityLED = humidityLED;
   }
+  /* =============================================================================== */
 
-  // Check if 30 seconds have passed since the last send
+  /* ======================= API Thingsboard ======================================= */
   if (millis() - lastSendTime >= sendInterval)
   {
     // Send data to ThingsBoard
@@ -306,32 +240,20 @@ void loop()
     // Update the last send time
     lastSendTime = millis();
   }
+  /* =============================================================================== */
 }
 
-// Option 2: Separate Functions
-bool isBelowMin(double value, double min)
+
+/* ======================= Particle Functions ==================================== */
+int setHumidity(String command)
 {
-  return value < min;
+  currentHumidity = command.toFloat();
+  return 1; // Success
 }
 
-bool isAboveMax(double value, double max)
+int setTemperature(String command)
 {
-  return value > max;
+  currentTemperature = command.toFloat();
+  return 1; // Success
 }
-
-uint32_t interpolateColor(uint32_t color1, uint32_t color2, float fraction)
-{
-  uint8_t r1 = (color1 >> 16) & 0xFF;
-  uint8_t g1 = (color1 >> 8) & 0xFF;
-  uint8_t b1 = color1 & 0xFF;
-
-  uint8_t r2 = (color2 >> 16) & 0xFF;
-  uint8_t g2 = (color2 >> 8) & 0xFF;
-  uint8_t b2 = color2 & 0xFF;
-
-  uint8_t r = r1 + fraction * (r2 - r1);
-  uint8_t g = g1 + fraction * (g2 - g1);
-  uint8_t b = b1 + fraction * (b2 - b1);
-
-  return (r << 16) | (g << 8) | b;
-}
+ /* ================================================================================ */
