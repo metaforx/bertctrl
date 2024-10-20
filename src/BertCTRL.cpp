@@ -4,25 +4,32 @@
 #include "I2CScanner.h"
 #include "neopixel.h"
 #include "wifi_creds.h"
+#include "SetupWifi.h"
 #include "ThingsboardClient.h"
 #include "NeopixelControls.h"
 
-/* ======================= ThingsboardClient =============================== */
+/* ======================= Init ==================================== */
+Adafruit_Si7021 si = Adafruit_Si7021();
+I2CScanner scanner;
+/* ================================================================= */
+
+/* ======================= Wifi ==================================== */
+// Defined in wifi_creds.cpp
+/* ================================================================= */
+
+/* ======================= ThingsboardClient ======================= */
 HttpClient http;
 const char *thingsBoardServer = "192.168.1.153";
 const char *accessToken = "2BodYeWy0G5o82nLrxUk";
 const int thingsBoardPort = 8080;
 unsigned long lastSendTime = 0;
 const unsigned long sendInterval = 5000; // 5 seconds in milliseconds
-/* ======================= ThingsboardClient =============================== */
+/* ================================================================= */
 
-/* ======================= NeopixelControls =============================== */
+/* ======================= NeopixelControls ======================== */
 const int fadeSteps = 50;
 const int fadeDelay = 2;
-/* ======================= NeopixelControls =============================== */
-
-Adafruit_Si7021 si = Adafruit_Si7021();
-I2CScanner scanner;
+/* ================================================================= */
 
 const int MAX_MAP_TEMPERATURE = 50;
 const int MIN_MAP_TEMPERATURE = 0;
@@ -175,35 +182,6 @@ void setLEDColorBasedOnState(SensorState sensorState, int temperatureLED, int hu
 
 SYSTEM_MODE(SEMI_AUTOMATIC);
 SYSTEM_THREAD(ENABLED);
-
-void setupWifi()
-{
-  credentials creds;
-  WiFi.on();
-  WiFi.disconnect();
-  WiFi.clearCredentials();
-
-  initWifiCredentials(); // Initialize credentials from environment variables
-
-  for (int i = 0; i < NUM_WIFI_CREDS; i++)
-  {
-    creds = wifiCreds[i];
-    if (creds.ssid && creds.password)
-    {
-      WiFi.setCredentials(creds.ssid, creds.password, creds.authType, creds.cipher);
-    }
-  }
-
-  WiFi.connect();
-  while (!WiFi.ready())
-  {
-    Serial.println("Connecting to WiFi...");
-    Serial.printlnf("Connecting to SSID: %s with Password: %s", creds.ssid, creds.password);
-    delay(1000);
-  }
-  Serial.println("Connected to WiFi");
-  Particle.connect();
-}
 
 int setHumidity(String command)
 {
