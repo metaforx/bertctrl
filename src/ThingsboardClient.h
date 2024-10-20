@@ -1,6 +1,7 @@
 #ifndef THINGSBOARD_CLIENT_H
 #define THINGSBOARD_CLIENT_H
 
+#include "Particle.h"
 #include "HttpClient.h"
 
 void sendDataToThingsBoard(float temperature, float humidity);
