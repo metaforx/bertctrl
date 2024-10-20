@@ -4,6 +4,16 @@
 #include "I2CScanner.h"
 #include "neopixel.h"
 #include "wifi_creds.h"
+#include "ThingsboardClient.h"
+
+/* ======================= ThingsboardClient =============================== */
+HttpClient http;
+const char *thingsBoardServer = "192.168.1.153";
+const char *accessToken = "2BodYeWy0G5o82nLrxUk";
+const int thingsBoardPort = 8080;
+unsigned long lastSendTime = 0;
+const unsigned long sendInterval = 5000; // 5 seconds in milliseconds
+/* ======================= ThingsboardClient =============================== */
 
 Adafruit_Si7021 si = Adafruit_Si7021();
 I2CScanner scanner;
@@ -25,11 +35,6 @@ bool isAboveMax(double value, double min);
 uint32_t ALERT_COLOR = 0xFF0000; // Red
 
 /* ======================= prototypes =============================== */
-// uint32_t Wheel(byte WheelPos);
-uint8_t red(uint32_t c);
-uint8_t green(uint32_t c);
-uint8_t blue(uint32_t c);
-void colorWipe(uint32_t c, uint8_t wait);
 uint32_t interpolateColor(uint32_t color1, uint32_t color2, float fraction);
 
 // NEOPIXEL: Set pixel COUNT, PIN and TYPE
@@ -39,7 +44,8 @@ uint32_t interpolateColor(uint32_t color1, uint32_t color2, float fraction);
 #define BRIGHTNESS 125 // 0 - 255
 #define FADE_STEPS 50  // Number of steps for the fade-in animation
 #define FADE_DELAY 2   // Delay between each fade step (in milliseconds)
-
+uint32_t currentPixelColors[PIXEL_COUNT];
+uint32_t temperatureDisplayColors[PIXEL_COUNT];
 Adafruit_NeoPixel strip(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 
 float clamp(float value, float min, float max)
@@ -60,10 +66,6 @@ int mapTemperatureToLED(float temperature)
 {
   temperature = clamp(temperature, MIN_MAP_TEMPERATURE, MAX_MAP_TEMPERATURE);
   int mappedValue = static_cast<int>(mapFloat(temperature, MIN_MAP_TEMPERATURE, MAX_MAP_TEMPERATURE, 0, strip.numPixels() - 1));
-  Serial.print("Temperature: ");
-  Serial.print(temperature);
-  Serial.print(" -> Mapped Temperature LED: ");
-  Serial.println(mappedValue);
   return mappedValue;
 }
 
@@ -71,10 +73,6 @@ int mapHumidityToLED(float humidity)
 {
   humidity = clamp(humidity, MIN_MAP_HUMIDITY, MAX_MAP_HUMIDITY);
   int mappedValue = static_cast<int>(mapFloat(humidity, MIN_MAP_HUMIDITY, MAX_MAP_HUMIDITY, 0, strip.numPixels() - 1));
-  Serial.print("Humidity: ");
-  Serial.print(humidity);
-  Serial.print(" -> Mapped Humidity LED: ");
-  Serial.println(mappedValue);
   return mappedValue;
 }
 
@@ -90,7 +88,8 @@ int previousTemperatureLED = -1;                // Track the previous temperatur
 int previousHumidityLED = -1;                   // Track the previous humidityLED value
 
 void clearLEDs();
-void fadeInPixel(int pixel, uint32_t color); // Function prototype
+void fadeInPixel(int pixel, uint32_t color);
+void fadeOutPixel(int pixel);
 void blinkLED(int pixel, uint32_t color, int times, int delayTime);
 
 String sensorStateString = "TEMPERATURE";
@@ -115,18 +114,17 @@ int setSensorState(String command)
 
 void setLEDColorBasedOnState(SensorState sensorState, int temperatureLED, int humidityLED)
 {
-
   // Normal operation: set LED colors based on state
   switch (sensorState)
   {
   case TEMPERATURE:
     for (int i = 0; i <= temperatureLED; i++)
     {
-      float fraction = (float)i / strip.numPixels();
+      // float fraction = (float)i / strip.numPixels();
 
-      uint32_t color1 = 0x0000FF; // Blue
-      uint32_t color2 = 0x00FF00; // Green
-      uint32_t color = interpolateColor(color1, color2, fraction);
+      // uint32_t color1 = 0x0000FF; // Blue
+      // uint32_t color2 = 0x00FF00; // Green
+      // uint32_t color = interpolateColor(color1, color2, fraction);
       if (isBelowMin(currentTemperature, MIN_TEMPERATURE + 5) && i == temperatureLED)
       {
         fadeInPixel(i, ALERT_COLOR);
@@ -137,8 +135,12 @@ void setLEDColorBasedOnState(SensorState sensorState, int temperatureLED, int hu
       }
       else
       {
-        fadeInPixel(i, color);
+        fadeInPixel(i, temperatureDisplayColors[i]);
       }
+    }
+    for (int i = strip.numPixels(); i > temperatureLED; i--)
+    {
+      fadeOutPixel(i);
     }
     break;
   case HUMIDITY:
@@ -148,28 +150,80 @@ void setLEDColorBasedOnState(SensorState sensorState, int temperatureLED, int hu
       uint32_t color1 = 0x00FF00; // Green
       uint32_t color2 = 0x0000FF; // Blue
       uint32_t color = interpolateColor(color1, color2, fraction);
-      fadeInPixel(i, color);
+      if (isBelowMin(currentHumidity, MIN_HUMIDITY + 5) && i == humidityLED)
+      {
+        fadeInPixel(i, ALERT_COLOR);
+      }
+      else if (isAboveMax(currentHumidity, MAX_HUMIDITY - 5) && i == humidityLED)
+      {
+        fadeInPixel(i, ALERT_COLOR);
+      }
+      else
+      {
+        fadeInPixel(i, color);
+      }
+    }
+    for (int i = strip.numPixels(); i > humidityLED; i--)
+    {
+
+      fadeOutPixel(i);
     }
     break;
   }
   strip.show();
 }
 
+uint32_t temperatureColors[16];
+uint32_t humidityColors[16];
+uint32_t neoPixelStates[16];
+
 void fadeInPixel(int pixel, uint32_t color)
 {
   uint8_t r = (color >> 16) & 0xFF;
   uint8_t g = (color >> 8) & 0xFF;
   uint8_t b = color & 0xFF;
-
-  for (int step = 0; step <= FADE_STEPS; step++)
+  Serial.print("Fading in pixel: ");
+  Serial.print(pixel);
+  Serial.print(" with color: ");
+  Serial.println(color, HEX);
+  Serial.println(strip.getPixelColor(pixel), HEX);
+  if (strip.getPixelColor(pixel) == 0 || strip.getPixelColor(pixel) != color)
   {
-    float fraction = (float)step / FADE_STEPS;
-    uint8_t rStep = r * fraction;
-    uint8_t gStep = g * fraction;
-    uint8_t bStep = b * fraction;
-    strip.setPixelColor(pixel, strip.Color(rStep, gStep, bStep));
+    for (int step = 0; step <= FADE_STEPS; step++)
+    {
+      float fraction = (float)step / FADE_STEPS;
+      uint8_t rStep = r * fraction;
+      uint8_t gStep = g * fraction;
+      uint8_t bStep = b * fraction;
+      strip.setPixelColor(pixel, strip.Color(rStep, gStep, bStep));
+
+      strip.show();
+      delay(FADE_DELAY);
+    }
+  }
+}
+
+void fadeOutPixel(int pixel)
+{
+  uint32_t color = strip.getPixelColor(pixel);
+  uint8_t r = (color >> 16) & 0xFF;
+  uint8_t g = (color >> 8) & 0xFF;
+  uint8_t b = color & 0xFF;
+
+  if (strip.getPixelColor(pixel) != 0)
+  {
+    for (int step = FADE_STEPS; step >= 0; step--)
+    {
+      float fraction = (float)step / FADE_STEPS;
+      uint8_t rStep = r * fraction;
+      uint8_t gStep = g * fraction;
+      uint8_t bStep = b * fraction;
+      strip.setPixelColor(pixel, strip.Color(rStep, gStep, bStep));
+      strip.show();
+      delay(FADE_DELAY);
+    }
+    strip.setPixelColor(pixel, 0); // Ensure the pixel is completely off
     strip.show();
-    delay(FADE_DELAY);
   }
 }
 
@@ -265,8 +319,52 @@ void setup()
     Serial.println("Failed to initialize I2C bus.");
   }
 
+  // COLORS /// INTERPOLATION
+  uint32_t blue = 0x0000FF;   // Blue
+  uint32_t green = 0x00FF00;  // Green
+  uint32_t purple = 0x800080; // Purple
+  uint32_t red = 0xFF0000;    // Red
+
+  // Number of steps per segment
+  uint32_t segmentSteps = strip.numPixels() / 3;
+  uint32_t remainingSteps = strip.numPixels() % 3;
+
+  // Precompute the colors in the array
+  for (uint32_t step = 0; step < strip.numPixels(); step++)
+  {
+    float fraction;
+    uint32_t color;
+
+    if (step < segmentSteps)
+    {
+      // Interpolate from Blue to Green
+      fraction = static_cast<float>(step) / segmentSteps;
+      color = interpolateColor(blue, green, fraction);
+    }
+    else if (step < 2 * segmentSteps + remainingSteps)
+    {
+      // Interpolate from Green to Purple
+      fraction = static_cast<float>(step - segmentSteps) / segmentSteps;
+      color = interpolateColor(green, purple, fraction);
+    }
+    else
+    {
+      // Interpolate from Purple to Red
+      fraction = static_cast<float>(step - 2 * segmentSteps - remainingSteps) / segmentSteps;
+      color = interpolateColor(purple, red, fraction);
+    }
+
+    // Store the color in the array
+    temperatureDisplayColors[step] = color;
+  }
+  //////////////////////////
+
   strip.setBrightness(BRIGHTNESS);
   strip.begin();
+  for (int i = 0; i < PIXEL_COUNT; i++)
+  {
+    currentPixelColors[i] = strip.getPixelColor(i);
+  }
   strip.show();
   Particle.function("setSensorState", setSensorState); // Register the cloud function
   Particle.variable("temperature", currentTemperature);
@@ -276,26 +374,36 @@ void setup()
   // Testing
 
   // Register Particle functions
-  Particle.function("setHumidity", setHumidity);
-  Particle.function("setTemperature", setTemperature);
+  // Particle.function("setHumidity", setHumidity);
+  // Particle.function("setTemperature", setTemperature);
 }
 
 void loop()
 {
   // si7021 - Get humidity and temperature data
-  // currentHumidity = si.readHumidity();
-  // currentTemperature = si.readTemperature();
+  currentHumidity = si.readHumidity();
+  currentTemperature = si.readTemperature();
   int temperatureLED = mapTemperatureToLED(currentTemperature);
   int humidityLED = mapHumidityToLED(currentHumidity);
 
   // Check if the sensor state or LED values have changed
   if (sensorState != previousSensorState || temperatureLED != previousTemperatureLED || humidityLED != previousHumidityLED)
   {
-    clearLEDs();
+    // clearLEDs();
     setLEDColorBasedOnState(sensorState, temperatureLED, humidityLED);
     previousSensorState = sensorState;
     previousTemperatureLED = temperatureLED;
     previousHumidityLED = humidityLED;
+  }
+
+  // Check if 30 seconds have passed since the last send
+  if (millis() - lastSendTime >= sendInterval)
+  {
+    // Send data to ThingsBoard
+    sendDataToThingsBoard(currentTemperature, currentHumidity);
+
+    // Update the last send time
+    lastSendTime = millis();
   }
 }
 
