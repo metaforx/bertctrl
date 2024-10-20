@@ -1,15 +1,20 @@
 #include "NeopixelControls.h"
 
+const bool NeopixelControlsDebug = false;
+
 void fadeInPixel(int pixel, uint32_t color)
 {
     uint8_t r = (color >> 16) & 0xFF;
     uint8_t g = (color >> 8) & 0xFF;
     uint8_t b = color & 0xFF;
-    Serial.print("Fading in pixel: ");
-    Serial.print(pixel);
-    Serial.print(" with color: ");
-    Serial.println(color, HEX);
-    Serial.println(strip.getPixelColor(pixel), HEX);
+    if (NeopixelControlsDebug)
+    {
+        Serial.print("Fading in pixel: ");
+        Serial.print(pixel);
+        Serial.print(" with color: ");
+        Serial.println(color, HEX);
+        Serial.println(strip.getPixelColor(pixel), HEX);
+    }
     if (strip.getPixelColor(pixel) == 0 || strip.getPixelColor(pixel) != color)
     {
         for (int step = 0; step <= fadeSteps; step++)

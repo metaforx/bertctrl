@@ -48,8 +48,7 @@ uint32_t interpolateColor(uint32_t color1, uint32_t color2, float fraction);
 #define PIXEL_COUNT 16
 #define PIXEL_TYPE WS2812B
 #define BRIGHTNESS 125 // 0 - 255
-#define FADE_STEPS 50  // Number of steps for the fade-in animation
-#define FADE_DELAY 2   // Delay between each fade step (in milliseconds)
+
 uint32_t currentPixelColors[PIXEL_COUNT];
 uint32_t temperatureDisplayColors[PIXEL_COUNT];
 Adafruit_NeoPixel strip(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
@@ -92,11 +91,6 @@ volatile SensorState sensorState = TEMPERATURE; // Use volatile for variables sh
 SensorState previousSensorState = TEMPERATURE;  // Track the previous state
 int previousTemperatureLED = -1;                // Track the previous temperatureLED value
 int previousHumidityLED = -1;                   // Track the previous humidityLED value
-
-void clearLEDs();
-void fadeInPixel(int pixel, uint32_t color);
-void fadeOutPixel(int pixel);
-void blinkLED(int pixel, uint32_t color, int times, int delayTime);
 
 String sensorStateString = "TEMPERATURE";
 int setSensorState(String command)
@@ -179,85 +173,8 @@ void setLEDColorBasedOnState(SensorState sensorState, int temperatureLED, int hu
   strip.show();
 }
 
-// uint32_t temperatureColors[16];
-// uint32_t humidityColors[16];
-// uint32_t neoPixelStates[16];
-
-// void fadeInPixel(int pixel, uint32_t color)
-// {
-//   uint8_t r = (color >> 16) & 0xFF;
-//   uint8_t g = (color >> 8) & 0xFF;
-//   uint8_t b = color & 0xFF;
-//   Serial.print("Fading in pixel: ");
-//   Serial.print(pixel);
-//   Serial.print(" with color: ");
-//   Serial.println(color, HEX);
-//   Serial.println(strip.getPixelColor(pixel), HEX);
-//   if (strip.getPixelColor(pixel) == 0 || strip.getPixelColor(pixel) != color)
-//   {
-//     for (int step = 0; step <= FADE_STEPS; step++)
-//     {
-//       float fraction = (float)step / FADE_STEPS;
-//       uint8_t rStep = r * fraction;
-//       uint8_t gStep = g * fraction;
-//       uint8_t bStep = b * fraction;
-//       strip.setPixelColor(pixel, strip.Color(rStep, gStep, bStep));
-
-//       strip.show();
-//       delay(FADE_DELAY);
-//     }
-//   }
-// }
-
-// void fadeOutPixel(int pixel)
-// {
-//   uint32_t color = strip.getPixelColor(pixel);
-//   uint8_t r = (color >> 16) & 0xFF;
-//   uint8_t g = (color >> 8) & 0xFF;
-//   uint8_t b = color & 0xFF;
-
-//   if (strip.getPixelColor(pixel) != 0)
-//   {
-//     for (int step = FADE_STEPS; step >= 0; step--)
-//     {
-//       float fraction = (float)step / FADE_STEPS;
-//       uint8_t rStep = r * fraction;
-//       uint8_t gStep = g * fraction;
-//       uint8_t bStep = b * fraction;
-//       strip.setPixelColor(pixel, strip.Color(rStep, gStep, bStep));
-//       strip.show();
-//       delay(FADE_DELAY);
-//     }
-//     strip.setPixelColor(pixel, 0); // Ensure the pixel is completely off
-//     strip.show();
-//   }
-// }
-
-// void blinkLED(int pixel, uint32_t color, int times, int delayTime)
-// {
-//   for (int i = 0; i < times; i++)
-//   {
-//     strip.setPixelColor(pixel, color);
-//     strip.show();
-//     delay(delayTime);
-//     strip.setPixelColor(pixel, 0); // Turn off the LED
-//     strip.show();
-//     delay(delayTime);
-//   }
-// }
-
-// void clearLEDs()
-// {
-//   for (int i = 0; i < strip.numPixels(); i++)
-//   {
-//     strip.setPixelColor(i, strip.Color(0, 0, 0)); // Turn off each LED
-//   }
-//   strip.show();
-// }
 SYSTEM_MODE(SEMI_AUTOMATIC);
 SYSTEM_THREAD(ENABLED);
-// SYSTEM_MODE(AUTOMATIC);
-// SYSTEM_THREAD(ENABLED);
 
 void setupWifi()
 {
