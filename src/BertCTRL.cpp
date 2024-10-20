@@ -5,6 +5,7 @@
 #include "neopixel.h"
 #include "wifi_creds.h"
 #include "ThingsboardClient.h"
+#include "NeopixelControls.h"
 
 /* ======================= ThingsboardClient =============================== */
 HttpClient http;
@@ -14,6 +15,11 @@ const int thingsBoardPort = 8080;
 unsigned long lastSendTime = 0;
 const unsigned long sendInterval = 5000; // 5 seconds in milliseconds
 /* ======================= ThingsboardClient =============================== */
+
+/* ======================= NeopixelControls =============================== */
+const int fadeSteps = 50;
+const int fadeDelay = 2;
+/* ======================= NeopixelControls =============================== */
 
 Adafruit_Si7021 si = Adafruit_Si7021();
 I2CScanner scanner;
@@ -173,81 +179,81 @@ void setLEDColorBasedOnState(SensorState sensorState, int temperatureLED, int hu
   strip.show();
 }
 
-uint32_t temperatureColors[16];
-uint32_t humidityColors[16];
-uint32_t neoPixelStates[16];
+// uint32_t temperatureColors[16];
+// uint32_t humidityColors[16];
+// uint32_t neoPixelStates[16];
 
-void fadeInPixel(int pixel, uint32_t color)
-{
-  uint8_t r = (color >> 16) & 0xFF;
-  uint8_t g = (color >> 8) & 0xFF;
-  uint8_t b = color & 0xFF;
-  Serial.print("Fading in pixel: ");
-  Serial.print(pixel);
-  Serial.print(" with color: ");
-  Serial.println(color, HEX);
-  Serial.println(strip.getPixelColor(pixel), HEX);
-  if (strip.getPixelColor(pixel) == 0 || strip.getPixelColor(pixel) != color)
-  {
-    for (int step = 0; step <= FADE_STEPS; step++)
-    {
-      float fraction = (float)step / FADE_STEPS;
-      uint8_t rStep = r * fraction;
-      uint8_t gStep = g * fraction;
-      uint8_t bStep = b * fraction;
-      strip.setPixelColor(pixel, strip.Color(rStep, gStep, bStep));
+// void fadeInPixel(int pixel, uint32_t color)
+// {
+//   uint8_t r = (color >> 16) & 0xFF;
+//   uint8_t g = (color >> 8) & 0xFF;
+//   uint8_t b = color & 0xFF;
+//   Serial.print("Fading in pixel: ");
+//   Serial.print(pixel);
+//   Serial.print(" with color: ");
+//   Serial.println(color, HEX);
+//   Serial.println(strip.getPixelColor(pixel), HEX);
+//   if (strip.getPixelColor(pixel) == 0 || strip.getPixelColor(pixel) != color)
+//   {
+//     for (int step = 0; step <= FADE_STEPS; step++)
+//     {
+//       float fraction = (float)step / FADE_STEPS;
+//       uint8_t rStep = r * fraction;
+//       uint8_t gStep = g * fraction;
+//       uint8_t bStep = b * fraction;
+//       strip.setPixelColor(pixel, strip.Color(rStep, gStep, bStep));
 
-      strip.show();
-      delay(FADE_DELAY);
-    }
-  }
-}
+//       strip.show();
+//       delay(FADE_DELAY);
+//     }
+//   }
+// }
 
-void fadeOutPixel(int pixel)
-{
-  uint32_t color = strip.getPixelColor(pixel);
-  uint8_t r = (color >> 16) & 0xFF;
-  uint8_t g = (color >> 8) & 0xFF;
-  uint8_t b = color & 0xFF;
+// void fadeOutPixel(int pixel)
+// {
+//   uint32_t color = strip.getPixelColor(pixel);
+//   uint8_t r = (color >> 16) & 0xFF;
+//   uint8_t g = (color >> 8) & 0xFF;
+//   uint8_t b = color & 0xFF;
 
-  if (strip.getPixelColor(pixel) != 0)
-  {
-    for (int step = FADE_STEPS; step >= 0; step--)
-    {
-      float fraction = (float)step / FADE_STEPS;
-      uint8_t rStep = r * fraction;
-      uint8_t gStep = g * fraction;
-      uint8_t bStep = b * fraction;
-      strip.setPixelColor(pixel, strip.Color(rStep, gStep, bStep));
-      strip.show();
-      delay(FADE_DELAY);
-    }
-    strip.setPixelColor(pixel, 0); // Ensure the pixel is completely off
-    strip.show();
-  }
-}
+//   if (strip.getPixelColor(pixel) != 0)
+//   {
+//     for (int step = FADE_STEPS; step >= 0; step--)
+//     {
+//       float fraction = (float)step / FADE_STEPS;
+//       uint8_t rStep = r * fraction;
+//       uint8_t gStep = g * fraction;
+//       uint8_t bStep = b * fraction;
+//       strip.setPixelColor(pixel, strip.Color(rStep, gStep, bStep));
+//       strip.show();
+//       delay(FADE_DELAY);
+//     }
+//     strip.setPixelColor(pixel, 0); // Ensure the pixel is completely off
+//     strip.show();
+//   }
+// }
 
-void blinkLED(int pixel, uint32_t color, int times, int delayTime)
-{
-  for (int i = 0; i < times; i++)
-  {
-    strip.setPixelColor(pixel, color);
-    strip.show();
-    delay(delayTime);
-    strip.setPixelColor(pixel, 0); // Turn off the LED
-    strip.show();
-    delay(delayTime);
-  }
-}
+// void blinkLED(int pixel, uint32_t color, int times, int delayTime)
+// {
+//   for (int i = 0; i < times; i++)
+//   {
+//     strip.setPixelColor(pixel, color);
+//     strip.show();
+//     delay(delayTime);
+//     strip.setPixelColor(pixel, 0); // Turn off the LED
+//     strip.show();
+//     delay(delayTime);
+//   }
+// }
 
-void clearLEDs()
-{
-  for (int i = 0; i < strip.numPixels(); i++)
-  {
-    strip.setPixelColor(i, strip.Color(0, 0, 0)); // Turn off each LED
-  }
-  strip.show();
-}
+// void clearLEDs()
+// {
+//   for (int i = 0; i < strip.numPixels(); i++)
+//   {
+//     strip.setPixelColor(i, strip.Color(0, 0, 0)); // Turn off each LED
+//   }
+//   strip.show();
+// }
 SYSTEM_MODE(SEMI_AUTOMATIC);
 SYSTEM_THREAD(ENABLED);
 // SYSTEM_MODE(AUTOMATIC);
