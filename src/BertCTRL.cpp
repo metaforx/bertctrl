@@ -49,8 +49,6 @@ double currentHumidity = 0.0;
 // custom utils
 uint32_t ALERT_COLOR = 0xFF0000; // Red
 
-
-
 // NEOPIXEL: Set pixel COUNT, PIN and TYPE
 #define PIXEL_PIN D2
 #define PIXEL_COUNT 16
@@ -162,8 +160,6 @@ void setLEDColorBasedOnState(SensorState sensorState, int temperatureLED, int hu
   strip.show();
 }
 
-
-
 void setup()
 {
   Serial.begin(9600);
@@ -243,7 +239,6 @@ void loop()
   /* =============================================================================== */
 }
 
-
 /* ======================= Particle Functions ==================================== */
 int setHumidity(String command)
 {
@@ -256,4 +251,4 @@ int setTemperature(String command)
   currentTemperature = command.toFloat();
   return 1; // Success
 }
- /* ================================================================================ */
+/* ================================================================================ */
