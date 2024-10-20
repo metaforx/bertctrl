@@ -56,7 +56,7 @@ uint32_t ALERT_COLOR = 0xFF0000; // Red
 #define BRIGHTNESS 125 // 0 - 255
 
 uint32_t currentPixelColors[PIXEL_COUNT];
-uint32_t temperatureDisplayColors[PIXEL_COUNT];
+
 Adafruit_NeoPixel strip(PIXEL_COUNT, PIXEL_PIN, PIXEL_TYPE);
 
 int mapTemperatureToLED(float temperature)

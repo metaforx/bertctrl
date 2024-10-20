@@ -1,6 +1,7 @@
 #include "NeopixelControls.h"
 
 const bool NeopixelControlsDebug = false;
+uint32_t *temperatureDisplayColors = new uint32_t[16];
 
 void fadeInPixel(int pixel, uint32_t color)
 {
@@ -95,10 +96,9 @@ uint32_t interpolateColor(uint32_t color1, uint32_t color2, float fraction)
 }
 
 // Default values for colors
-uint32_t *precomputeColors()
+void precomputeColors()
 {
     uint32_t numPixels = strip.numPixels();
-    uint32_t *temperatureDisplayColors = new uint32_t[numPixels];
 
     // COLORS /// INTERPOLATION
     uint32_t blue = 0x0000FF;   // Blue
@@ -138,6 +138,4 @@ uint32_t *precomputeColors()
         // Store the color in the array
         temperatureDisplayColors[step] = color;
     }
-
-    return temperatureDisplayColors;
 }
