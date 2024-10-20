@@ -76,3 +76,68 @@ void clearLEDs()
     }
     strip.show();
 }
+
+uint32_t interpolateColor(uint32_t color1, uint32_t color2, float fraction)
+{
+    uint8_t r1 = (color1 >> 16) & 0xFF;
+    uint8_t g1 = (color1 >> 8) & 0xFF;
+    uint8_t b1 = color1 & 0xFF;
+
+    uint8_t r2 = (color2 >> 16) & 0xFF;
+    uint8_t g2 = (color2 >> 8) & 0xFF;
+    uint8_t b2 = color2 & 0xFF;
+
+    uint8_t r = r1 + fraction * (r2 - r1);
+    uint8_t g = g1 + fraction * (g2 - g1);
+    uint8_t b = b1 + fraction * (b2 - b1);
+
+    return (r << 16) | (g << 8) | b;
+}
+
+// Default values for colors
+uint32_t *precomputeColors()
+{
+    uint32_t numPixels = strip.numPixels();
+    uint32_t *temperatureDisplayColors = new uint32_t[numPixels];
+
+    // COLORS /// INTERPOLATION
+    uint32_t blue = 0x0000FF;   // Blue
+    uint32_t green = 0x00FF00;  // Green
+    uint32_t purple = 0x800080; // Purple
+    uint32_t red = 0xFF0000;    // Red
+
+    // Number of steps per segment
+    uint32_t segmentSteps = numPixels / 3;
+    uint32_t remainingSteps = numPixels % 3;
+
+    // Precompute the colors in the array
+    for (uint32_t step = 0; step < numPixels; step++)
+    {
+        float fraction;
+        uint32_t color;
+
+        if (step < segmentSteps)
+        {
+            // Interpolate from Blue to Green
+            fraction = static_cast<float>(step) / segmentSteps;
+            color = interpolateColor(blue, green, fraction);
+        }
+        else if (step < 2 * segmentSteps + remainingSteps)
+        {
+            // Interpolate from Green to Purple
+            fraction = static_cast<float>(step - segmentSteps) / segmentSteps;
+            color = interpolateColor(green, purple, fraction);
+        }
+        else
+        {
+            // Interpolate from Purple to Red
+            fraction = static_cast<float>(step - 2 * segmentSteps - remainingSteps) / segmentSteps;
+            color = interpolateColor(purple, red, fraction);
+        }
+
+        // Store the color in the array
+        temperatureDisplayColors[step] = color;
+    }
+
+    return temperatureDisplayColors;
+}
