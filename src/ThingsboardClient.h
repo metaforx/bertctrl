@@ -4,7 +4,7 @@
 #include "HttpClient.h"
 
 void sendDataToThingsBoard(float temperature, float humidity);
-extern bool ThingsboardClientDebug;
+extern const bool ThingsboardClientDebug;
 extern const char *accessToken;
 extern const char *thingsBoardServer;
 extern const int thingsBoardPort;
