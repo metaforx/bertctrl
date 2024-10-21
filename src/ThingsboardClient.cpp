@@ -1,7 +1,6 @@
 /* ======================= Thingsboard =============================== */
 #include "ThingsboardClient.h"
 
-
 const bool ThingsboardClientDebug = false;
 
 // HTTP request and response
@@ -12,7 +11,7 @@ http_header_t headers[] = {
     {NULL, NULL} // Terminate the headers array
 };
 
-void sendDataToThingsBoard(float temperature, float humidity)
+void sendDataToThingsBoard(float temperature, float temperature2, float humidity)
 {
     // Set the request details
     request.hostname = thingsBoardServer;
@@ -20,7 +19,7 @@ void sendDataToThingsBoard(float temperature, float humidity)
     request.path = String("/api/v1/") + accessToken + "/telemetry"; // Construct the request path
 
     // Create the JSON payload
-    String payload = "{\"temperature\":" + String(temperature) + ",\"humidity\":" + String(humidity) + "}";
+    String payload = "{\"temperature\":" + String(temperature) + ",\"temperature2\":" + String(temperature2) + ",\"humidity\":" + String(humidity) + "}";
 
     // Set the request body
     request.body = payload;

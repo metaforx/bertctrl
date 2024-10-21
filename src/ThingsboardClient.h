@@ -4,7 +4,7 @@
 #include "Particle.h"
 #include "HttpClient.h"
 
-void sendDataToThingsBoard(float temperature, float humidity);
+void sendDataToThingsBoard(float temperature, float temperature2, float humidity);
 extern const bool ThingsboardClientDebug;
 extern const char *accessToken;
 extern const char *thingsBoardServer;

@@ -11,39 +11,39 @@
 #include "OneWire.h"
 #include "spark-dallas-temperature.h"
 
-/* ======================= Init ==================================== */
+/* ======================= Init ================================================ */
 Adafruit_Si7021 si = Adafruit_Si7021();
 I2CScanner scanner;
-/* ================================================================= */
+/* ============================================================================== */
 
-/* ======================= System & Wifi =========================== */
+/* ======================= System & Wifi ======================================= */
 SYSTEM_MODE(SEMI_AUTOMATIC);
 SYSTEM_THREAD(ENABLED);
 // Creds defined in wifi_creds.cpp
-/* ================================================================= */
+/* ============================================================================== */
 
-/* ======================= ThingsboardClient ======================= */
+/* ======================= ThingsboardClient =================================== */
 HttpClient http;
 const char *thingsBoardServer = "192.168.1.153";
 const char *accessToken = "2BodYeWy0G5o82nLrxUk";
 const int thingsBoardPort = 8080;
 unsigned long lastSendTime = 0;
 const unsigned long sendInterval = 5000; // 5 seconds in milliseconds
-/* ================================================================= */
+/* ============================================================================== */
 
-/* ======================= NeopixelControls ======================== */
+/* ======================= NeopixelControls ==================================== */
 const int fadeSteps = 50;
 const int fadeDelay = 2;
-/* ================================================================= */
+/* ============================================================================== */
 
-/* ======================= DS18B20 ================================= */
+/* ======================= DS18B20 ============================================= */
 #define DS18B20_PIN D3 // Define the pin where the DS18B20 is connected
 
 OneWire oneWire(DS18B20_PIN); // Create a OneWire instance
 DallasTemperature tempSens(&oneWire);
-/* ================================================================= */
+/* ============================================================================== */
 
-/* ======================= TODO: clean up mess ===================== */
+/* ======================= TODO: clean up mess ================================= */
 const int MAX_MAP_TEMPERATURE = 50;
 const int MIN_MAP_TEMPERATURE = 0;
 const int MAX_TEMPERATURE = 43;
@@ -172,11 +172,11 @@ void setLEDColorBasedOnState(SensorState sensorState, int temperatureLED, int hu
 void setup()
 {
   Serial.begin(9600);
-  /* ======================= Wifi ============================== */
+  /* ======================= Wifi ============================================== */
   setupWifi();
-  /* ========================================================= */
+  /* =========================================================================== */
 
-  /* ======================= I2C Scanner ============================== */
+  /* ======================= I2C Scanner ======================================= */
   if (scanner.begin())
   {
     Serial.println("I2C bus initialized successfully.");
@@ -187,7 +187,7 @@ void setup()
     Serial.println("Failed to initialize I2C bus.");
   }
 
-  /* ======================= Si7021 Temperature Sensor ============================== */
+  /* ======================= Si7021 Temperature Sensor ========================= */
   Serial.println("Si7021 test");
   if (!si.begin())
   {
@@ -195,9 +195,9 @@ void setup()
     while (1)
       ;
   }
-  /* =============================================================================== */
+  /* =========================================================================== */
 
-  /* ======================= Dallas Temperature Sensor ============================== */
+  /* ======================= Dallas Temperature Sensor ========================= */
   Serial.println("Dallas Temperature IC test");
   tempSens.begin();
   if (tempSens.getDeviceCount() == 0)
@@ -210,9 +210,9 @@ void setup()
   {
     Serial.println("Dallas Temperature IC Control Library Demo");
   }
-  /* =============================================================================== */
+  /* =========================================================================== */
 
-  /* ======================= Color Setup ===========================================*/
+  /* ======================= Color Setup ======================================= */
   precomputeColors();
   strip.setBrightness(BRIGHTNESS);
   strip.begin();
@@ -221,9 +221,9 @@ void setup()
     currentPixelColors[i] = strip.getPixelColor(i);
   }
   strip.show();
-  /* =============================================================================== */
+  /* =========================================================================== */
 
-  /* ======================= Particle Functions ==================================== */
+  /* ======================= Particle Functions ================================ */
   Particle.function("setSensorState", setSensorState); // Register the cloud function
   Particle.variable("temperature", currentTemperature);
   Particle.variable("humidity", currentHumidity);
@@ -232,7 +232,7 @@ void setup()
   // Testing
   // Particle.function("setHumidity", setHumidity);
   // Particle.function("setTemperature", setTemperature);
-  /* ================================================================================ */
+  /* =========================================================================== */
 }
 
 void loop()
@@ -248,12 +248,12 @@ void loop()
   Serial.print(temperatureF);
   Serial.println("°F");
 
-  /* ======================= si7021 - Get Sensor Data ============================== */
+  /* ======================= si7021 - Get Sensor Data ========================== */
   currentHumidity = si.readHumidity();
   currentTemperature = si.readTemperature();
-  /* =============================================================================== */
+  /* =========================================================================== */
 
-  /* ======================= LED Display Mapped ==================================== */
+  /* ======================= LED Display Mapped ================================ */
   int temperatureLED = mapTemperatureToLED(currentTemperature);
   int humidityLED = mapHumidityToLED(currentHumidity);
 
@@ -265,21 +265,21 @@ void loop()
     previousTemperatureLED = temperatureLED;
     previousHumidityLED = humidityLED;
   }
-  /* =============================================================================== */
+  /* =========================================================================== */
 
-  /* ======================= API Thingsboard ======================================= */
+  /* ======================= API Thingsboard =================================== */
   if (millis() - lastSendTime >= sendInterval)
   {
     // Send data to ThingsBoard
-    sendDataToThingsBoard(currentTemperature, currentHumidity);
+    sendDataToThingsBoard(currentTemperature, temperatureC, currentHumidity);
 
     // Update the last send time
     lastSendTime = millis();
   }
-  /* =============================================================================== */
+  /* =========================================================================== */
 }
 
-/* ======================= Particle Functions ==================================== */
+/* ======================= Particle Functions ================================ */
 int setHumidity(String command)
 {
   currentHumidity = command.toFloat();
@@ -291,4 +291,4 @@ int setTemperature(String command)
   currentTemperature = command.toFloat();
   return 1; // Success
 }
-/* ================================================================================ */
+/* =========================================================================== */
