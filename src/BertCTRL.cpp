@@ -240,9 +240,8 @@ void setup()
 void loop()
 {
   /* =============== Dallas Temperature Sensor - Get Sensor Data =============== */
-  tempSens.requestTemperatures();                   // Send the command to get temperatures
-  float temperatureC = tempSens.getTempCByIndex(0); // Read temperature in Celsius
-  float temperatureF = tempSens.getTempFByIndex(0); // Read temperature in Fahrenheit
+  tempSens.requestTemperatures();
+  float temperatureC = tempSens.getTempCByIndex(0);
   /* =========================================================================== */
 
   /* ======================= si7021 - Get Sensor Data ========================== */
