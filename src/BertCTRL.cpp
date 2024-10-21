@@ -8,6 +8,8 @@
 #include "ThingsboardClient.h"
 #include "NeopixelControls.h"
 #include "BertUtils.h"
+#include "OneWire.h"
+#include "spark-dallas-temperature.h"
 
 /* ======================= Init ==================================== */
 Adafruit_Si7021 si = Adafruit_Si7021();
@@ -32,6 +34,13 @@ const unsigned long sendInterval = 5000; // 5 seconds in milliseconds
 /* ======================= NeopixelControls ======================== */
 const int fadeSteps = 50;
 const int fadeDelay = 2;
+/* ================================================================= */
+
+/* ======================= DS18B20 ================================= */
+#define DS18B20_PIN D3 // Define the pin where the DS18B20 is connected
+
+OneWire oneWire(DS18B20_PIN); // Create a OneWire instance
+DallasTemperature tempSens(&oneWire);
 /* ================================================================= */
 
 /* ======================= TODO: clean up mess ===================== */
@@ -163,16 +172,11 @@ void setLEDColorBasedOnState(SensorState sensorState, int temperatureLED, int hu
 void setup()
 {
   Serial.begin(9600);
+  /* ======================= Wifi ============================== */
   setupWifi();
+  /* ========================================================= */
 
-  Serial.println("Si7021 test");
-  if (!si.begin())
-  {
-    Serial.println("Did not find Si7021 sensor!");
-    while (1)
-      ;
-  }
-
+  /* ======================= I2C Scanner ============================== */
   if (scanner.begin())
   {
     Serial.println("I2C bus initialized successfully.");
@@ -182,6 +186,31 @@ void setup()
   {
     Serial.println("Failed to initialize I2C bus.");
   }
+
+  /* ======================= Si7021 Temperature Sensor ============================== */
+  Serial.println("Si7021 test");
+  if (!si.begin())
+  {
+    Serial.println("Did not find Si7021 sensor!");
+    while (1)
+      ;
+  }
+  /* =============================================================================== */
+
+  /* ======================= Dallas Temperature Sensor ============================== */
+  Serial.println("Dallas Temperature IC test");
+  tempSens.begin();
+  if (tempSens.getDeviceCount() == 0)
+  {
+    Serial.println("No DS18B20 sensors are connected!");
+    while (1)
+      ; // Halt execution if no sensors are found
+  }
+  else
+  {
+    Serial.println("Dallas Temperature IC Control Library Demo");
+  }
+  /* =============================================================================== */
 
   /* ======================= Color Setup ===========================================*/
   precomputeColors();
@@ -208,6 +237,17 @@ void setup()
 
 void loop()
 {
+
+  tempSens.requestTemperatures();                   // Send the command to get temperatures
+  float temperatureC = tempSens.getTempCByIndex(0); // Read temperature in Celsius
+  float temperatureF = tempSens.getTempFByIndex(0); // Read temperature in Fahrenheit
+
+  Serial.print("Temperature: ");
+  Serial.print(temperatureC);
+  Serial.print("°C  ");
+  Serial.print(temperatureF);
+  Serial.println("°F");
+
   /* ======================= si7021 - Get Sensor Data ============================== */
   currentHumidity = si.readHumidity();
   currentTemperature = si.readTemperature();

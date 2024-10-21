@@ -6,7 +6,14 @@
         "__hash_table": "cpp",
         "initializer_list": "cpp",
         "unordered_map": "cpp",
-        "cstdlib": "cpp"
+        "cstdlib": "cpp",
+        "__bit_reference": "cpp",
+        "__split_buffer": "cpp",
+        "array": "cpp",
+        "deque": "cpp",
+        "string": "cpp",
+        "string_view": "cpp",
+        "vector": "cpp"
     },
     "particle.firmwareVersion": "3.3.1",
     "particle.targetDevice": "bertctrl",
