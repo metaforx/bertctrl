@@ -28,7 +28,7 @@ const char *thingsBoardServer = "192.168.1.153";
 const char *accessToken = "2BodYeWy0G5o82nLrxUk";
 const int thingsBoardPort = 8080;
 unsigned long lastSendTime = 0;
-const unsigned long sendInterval = 5000; // 5 seconds in milliseconds
+const unsigned long sendInterval = 60000; // 60 seconds in milliseconds
 /* ============================================================================== */
 
 /* ======================= NeopixelControls ==================================== */
@@ -169,6 +169,8 @@ void setLEDColorBasedOnState(SensorState sensorState, int temperatureLED, int hu
   strip.show();
 }
 
+/* ======================= End Mess ============================================ */
+
 void setup()
 {
   Serial.begin(9600);
@@ -237,16 +239,11 @@ void setup()
 
 void loop()
 {
-
+  /* =============== Dallas Temperature Sensor - Get Sensor Data =============== */
   tempSens.requestTemperatures();                   // Send the command to get temperatures
   float temperatureC = tempSens.getTempCByIndex(0); // Read temperature in Celsius
   float temperatureF = tempSens.getTempFByIndex(0); // Read temperature in Fahrenheit
-
-  Serial.print("Temperature: ");
-  Serial.print(temperatureC);
-  Serial.print("°C  ");
-  Serial.print(temperatureF);
-  Serial.println("°F");
+  /* =========================================================================== */
 
   /* ======================= si7021 - Get Sensor Data ========================== */
   currentHumidity = si.readHumidity();
