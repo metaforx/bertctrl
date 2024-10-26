@@ -10,6 +10,7 @@
 #include "BertUtils.h"
 #include "OneWire.h"
 #include "spark-dallas-temperature.h"
+#include <multi_channel_relay.h>
 
 /* ======================= Init ================================================ */
 Adafruit_Si7021 si = Adafruit_Si7021();
@@ -22,9 +23,9 @@ SYSTEM_THREAD(ENABLED);
 // Creds defined in wifi_creds.cpp
 /* ============================================================================== */
 
-/* ======================= ThingsboardClient =================================== */
+/* ======================= ThingsboardClient ==================================== */
 HttpClient http;
-const char *thingsBoardServer = "192.168.1.153";
+const char *thingsBoardServer = "192.168.1.154";
 const char *accessToken = "2BodYeWy0G5o82nLrxUk";
 const int thingsBoardPort = 8080;
 unsigned long lastSendTime = 0;
@@ -41,6 +42,10 @@ const int fadeDelay = 2;
 
 OneWire oneWire(DS18B20_PIN); // Create a OneWire instance
 DallasTemperature tempSens(&oneWire);
+/* ============================================================================== */
+
+/* ======================= Relays ============================================= */
+Multi_Channel_Relay relay;
 /* ============================================================================== */
 
 /* ======================= TODO: clean up mess ================================= */
@@ -234,6 +239,58 @@ void setup()
   // Testing
   // Particle.function("setHumidity", setHumidity);
   // Particle.function("setTemperature", setTemperature);
+  /* =========================================================================== */
+
+  /* ======================= Multi Channel Relay =============================== */
+  // Set I2C address and start relay
+  relay.begin(0x11);
+
+  /* Begin Controlling Relay */
+  DEBUG_PRINT.println("Channel 1 on");
+  relay.turn_on_channel(1);
+  delay(500);
+  DEBUG_PRINT.println("Channel 2 on");
+  relay.turn_off_channel(1);
+  relay.turn_on_channel(2);
+  delay(500);
+  DEBUG_PRINT.println("Channel 3 on");
+  relay.turn_off_channel(2);
+  relay.turn_on_channel(3);
+  delay(500);
+  DEBUG_PRINT.println("Channel 4 on");
+  relay.turn_off_channel(3);
+  relay.turn_on_channel(4);
+  delay(500);
+  relay.turn_off_channel(4);
+
+  relay.channelCtrl(CHANNLE1_BIT |
+                    CHANNLE2_BIT |
+                    CHANNLE3_BIT |
+                    CHANNLE4_BIT);
+  DEBUG_PRINT.print("Turn all channels on, State: ");
+  DEBUG_PRINT.println(relay.getChannelState(), BIN);
+
+  delay(2000);
+
+  relay.channelCtrl(CHANNLE1_BIT |
+                    CHANNLE3_BIT);
+  DEBUG_PRINT.print("Turn 1 3 channels on, State: ");
+  DEBUG_PRINT.println(relay.getChannelState(), BIN);
+
+  delay(2000);
+
+  relay.channelCtrl(CHANNLE2_BIT |
+                    CHANNLE4_BIT);
+  DEBUG_PRINT.print("Turn 2 4 channels on, State: ");
+  DEBUG_PRINT.println(relay.getChannelState(), BIN);
+
+  delay(2000);
+
+  relay.channelCtrl(0);
+  DEBUG_PRINT.print("Turn off all channels, State: ");
+  DEBUG_PRINT.println(relay.getChannelState(), BIN);
+
+  delay(2000);
   /* =========================================================================== */
 }
 
