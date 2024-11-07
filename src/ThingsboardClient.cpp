@@ -11,7 +11,7 @@ http_header_t headers[] = {
     {NULL, NULL} // Terminate the headers array
 };
 
-void sendDataToThingsBoard(float temperature, float temperature2, float humidity)
+void sendDataToThingsBoard(float temperature, float temperature2, float temperature3)
 {
     // Set the request details
     request.hostname = thingsBoardServer;
@@ -19,7 +19,7 @@ void sendDataToThingsBoard(float temperature, float temperature2, float humidity
     request.path = String("/api/v1/") + accessToken + "/telemetry"; // Construct the request path
 
     // Create the JSON payload
-    String payload = "{\"temperature\":" + String(temperature) + ",\"temperature2\":" + String(temperature2) + ",\"humidity\":" + String(humidity) + "}";
+    String payload = "{\"temperature\":" + String(temperature) + ",\"temperature2\":" + String(temperature2) + ",\"temperature3\":" + String(temperature3) + "}";
 
     // Set the request body
     request.body = payload;
