@@ -26,12 +26,7 @@ const char *thingsBoardServer = "192.168.1.154";
 const char *accessToken = "2BodYeWy0G5o82nLrxUk";
 const int thingsBoardPort = 8080;
 unsigned long lastSendTime = 0;
-const unsigned long sendInterval = 60000; // 60 seconds in milliseconds
-/* ============================================================================== */
-
-/* ======================= NeopixelControls ==================================== */
-const int fadeSteps = 50;
-const int fadeDelay = 2;
+const unsigned long sendInterval = 1000; // 60 seconds in milliseconds
 /* ============================================================================== */
 
 /* ======================= DS18B20 ============================================= */
@@ -157,10 +152,12 @@ void loop()
       Serial.println(tempC);
     }
     // Send data to ThingsBoard
-    sendDataToThingsBoard(tempSensors.getTempCByIndex(0), tempSensors.getTempCByIndex(1), tempSensors.getTempCByIndex(2));
+    // sendDataToThingsBoard(tempSensors.getTempCByIndex(0), tempSensors.getTempCByIndex(1), tempSensors.getTempCByIndex(2));
 
     // Update the last send time
     lastSendTime = millis();
   }
   /* =========================================================================== */
 }
+
+// 3 lila, 2 red, 1 yellow
