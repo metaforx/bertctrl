@@ -26,7 +26,7 @@ const char *thingsBoardServer = "192.168.1.154";
 const char *accessToken = "2BodYeWy0G5o82nLrxUk";
 const int thingsBoardPort = 8080;
 unsigned long lastSendTime = 0;
-const unsigned long sendInterval = 1000; // 60 seconds in milliseconds
+const unsigned long sendInterval = 60000; // 60 seconds in milliseconds
 /* ============================================================================== */
 
 /* ======================= DS18B20 ============================================= */
@@ -40,7 +40,31 @@ float tempC;
 
 /* ======================= Relays ============================================= */
 Multi_Channel_Relay relay;
+int relayOnTimes[3][2] = {
+    {22, 40}, // Relay 0 on at 7:30 AM
+    {22, 41}, // Relay 1 on at 8:00 AM
+    {22, 42}  // Relay 2 on at 11:00 AM
+};
+
+int relayOffTimes[3][2] = {
+    {22, 43}, // Relay 0 off at 8:00 PM
+    {22, 43}, // Relay 1 off at 8:30 PM
+    {22, 43}  // Relay 2 off at 9:00 PM
+};
 /* ============================================================================== */
+
+bool isTimeBetween(int currentMinutes, int onMinutes, int offMinutes)
+{
+  if (onMinutes < offMinutes)
+  {
+    return currentMinutes >= onMinutes && currentMinutes < offMinutes;
+  }
+  else
+  {
+    // Handle cases where the off time is on the next day
+    return currentMinutes >= onMinutes || currentMinutes < offMinutes;
+  }
+}
 
 void setup()
 {
@@ -91,6 +115,7 @@ void setup()
   /* ======================= Multi Channel Relay Test =============================== */
   // Set I2C address and start relay
   relay.begin(RELAY_ADDRESS);
+  Time.zone(+1);
 
   /* Begin Controlling Relay */
   DEBUG_PRINT.println("Channel 1 on");
@@ -141,7 +166,34 @@ void setup()
 
 void loop()
 {
+  int currentHour = Time.hour();
+  int currentMinute = Time.minute();
+
+  Serial.printlnf("Current time: %d:%d", currentHour, currentMinute);
+
+  // Check time and control relays
+  int currentMinutes = Time.hour() * 60 + Time.minute();
+
+  // Control relay 0
+  int relay0OnMinutes = relayOnTimes[0][0] * 60 + relayOnTimes[0][1];
+  int relay0OffMinutes = relayOffTimes[0][0] * 60 + relayOffTimes[0][1];
+  bool relay0On = isTimeBetween(currentMinutes, relay0OnMinutes, relay0OffMinutes);
+  relay0On ? relay.turn_on_channel(1) : relay.turn_off_channel(1);
+
+  // Control relay 1
+  int relay1OnMinutes = relayOnTimes[1][0] * 60 + relayOnTimes[1][1];
+  int relay1OffMinutes = relayOffTimes[1][0] * 60 + relayOffTimes[1][1];
+  bool relay1On = isTimeBetween(currentMinutes, relay1OnMinutes, relay1OffMinutes);
+  relay1On ? relay.turn_on_channel(2) : relay.turn_off_channel(2);
+
+  // Control relay 2
+  int relay2OnMinutes = relayOnTimes[2][0] * 60 + relayOnTimes[2][1];
+  int relay2OffMinutes = relayOffTimes[2][0] * 60 + relayOffTimes[2][1];
+  bool relay2On = isTimeBetween(currentMinutes, relay2OnMinutes, relay2OffMinutes);
+  relay2On ? relay.turn_on_channel(3) : relay.turn_off_channel(3);
+
   tempSensors.requestTemperatures();
+
   /* ======================= API Thingsboard =================================== */
   if (millis() - lastSendTime >= sendInterval)
   {
@@ -152,7 +204,7 @@ void loop()
       Serial.println(tempC);
     }
     // Send data to ThingsBoard
-    // sendDataToThingsBoard(tempSensors.getTempCByIndex(0), tempSensors.getTempCByIndex(1), tempSensors.getTempCByIndex(2));
+    sendDataToThingsBoard(tempSensors.getTempCByIndex(0), tempSensors.getTempCByIndex(1), tempSensors.getTempCByIndex(2));
 
     // Update the last send time
     lastSendTime = millis();
