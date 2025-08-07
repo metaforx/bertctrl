@@ -56,3 +56,4 @@ Thumbs.db
 .env
 src/wifi_creds.cpp
 .envrc
+src/secrets.h
