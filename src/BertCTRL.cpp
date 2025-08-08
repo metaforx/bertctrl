@@ -20,12 +20,12 @@ SYSTEM_MODE(SEMI_AUTOMATIC);
 SYSTEM_THREAD(ENABLED);
 /* ============================================================================== */
 
-/* ======================= ThingsboardClient ==================================== */
+/* ======================= API publication ====================================== */
 unsigned long lastSendTime = 0;
-const unsigned long sendInterval = 60000 * 15; // 15 minutes in milliseconds
+const unsigned long sendInterval = 10000; // 60000 * 15; // 15 minutes in milliseconds
 /* ============================================================================== */
 
-/* ======================= DS18B20 ============================================= */
+/* ======================= DS18B20 ============================================== */
 #define DS18B20_PIN D2 // Define the pin where the DS18B20 is connected
 OneWire oneWire(DS18B20_PIN); // Create a OneWire instance
 DallasTemperature tempSensors(&oneWire);
@@ -33,9 +33,9 @@ int deviceCount = 0;
 float tempC;
 /* ============================================================================== */
 
-/* ======================= Relays ============================================= */
+/* ======================= Relays ============================================== */
 Multi_Channel_Relay relay;
-
+const int ACTIVE_CHANNELS[] = {2,3,4};
 // Define the TimeInterval struct
 struct TimeInterval {
     int startHour;
@@ -46,17 +46,19 @@ struct TimeInterval {
 
 // Define on/off intervals for each channel
 std::vector<TimeInterval> relayTimes[3] = {
-    {{21, 22, 22, 45}, {23, 0, 23, 60}, {0, 0, 12, 0}}, // CHHANNEL 1: divide packages when steppig over midnight
-    {{21, 22, 22, 45}}, // CHHANNEL 2
-    {{21, 22, 22, 45}, {22, 55, 23, 00}} // CHHANNEL 3
+    {{12, 25, 13, 55}, {12, 55, 13, 59}}, // Note: divide packages when steppig over midnight
+    {{12, 25, 13, 55}},
+    {{12, 25, 13, 55}}
 };
 /* =========================================================================== */
 
 /* ======================= Temperature Thresholds ============================ */
-const float TEMP_THRESHOLD_HIGH = 25.0;  // High temperature threshold
+// 3 purple, 2 red, 1 yellow
+const float TEMP_THRESHOLD_HIGH = 28.0;  // High temperature threshold
 const float TEMP_THRESHOLD_LOW = 18.0;   // Low temperature threshold
 const int TEMP_SENSOR_LOW = 0; // Index of the low temperature sensor
 const int TEMP_SENSOR_HIGH = 1; // Index of the high temperature sensor
+const int HEATLAMP_CHANNEL = 2; // Channel for the heatlamp
 /* ============================================================================ */
 
 
@@ -175,27 +177,23 @@ void loop()
   Serial.printlnf("Current time: %d:%d", currentHour, currentMinute);
 
 
-  // Iterate through each channel
-  int activeChannels[] = {2,3,4};
-  for (size_t i = 0; i < sizeof(activeChannels) / sizeof(activeChannels[0]); i++) {
-    int channel = activeChannels[i]; // Get the current channel
+  // Iterate through each active channel
+  for (size_t i = 0; i < sizeof(ACTIVE_CHANNELS) / sizeof(ACTIVE_CHANNELS[0]); i++) {
+    int channel = ACTIVE_CHANNELS[i]; // Get the current channel
     bool channelOn = false;
-
+    
     // Check each time interval for the current channel
-    for (const auto& timeSlot : relayTimes[channel - 1]) { // Adjust for 0-based indexing in relayTimes
-        if (isTimeBetween(currentMinutes, timeSlot.startHour, timeSlot.startMinute, timeSlot.endHour, timeSlot.endMinute)) {
-            channelOn = true;
-            break;
-        }
+    for (const auto& timeSlot : relayTimes[i]) {
+      if (((channel == HEATLAMP_CHANNEL) && (tempSensors.getTempCByIndex(TEMP_SENSOR_HIGH) > TEMP_THRESHOLD_HIGH)) || 
+          ((channel == HEATLAMP_CHANNEL) && (tempSensors.getTempCByIndex(TEMP_SENSOR_LOW) > TEMP_THRESHOLD_LOW))) {
+          channelOn = false; // Turn off the channel if temperature is out of bounds
+          break;
+      }
+      if (isTimeBetween(currentMinutes, timeSlot.startHour, timeSlot.startMinute, timeSlot.endHour, timeSlot.endMinute)) {
+          channelOn = true;
+          break;
+      }
     }
-
-    // Only check temperature thresholds for channel 1
-    // if (channel == 1) {
-    //     if (tempSensors.getTempCByIndex(TEMP_SENSOR_HIGH) > TEMP_THRESHOLD_HIGH ||
-    //         tempSensors.getTempCByIndex(TEMP_SENSOR_LOW) > TEMP_THRESHOLD_LOW) {
-    //         channelOn = false; // Turn off the channel if temperature is out of bounds
-    //     }
-    // }
 
     channelOn ? relay.turn_on_channel(channel) : relay.turn_off_channel(channel);
   }
@@ -223,7 +221,7 @@ void loop()
       Serial.println(data);
 
       // Publish the JSON string for the webhook
-      Particle.publish("jardin-data", data, PRIVATE);
+      // Particle.publish("jardin-data", data, PRIVATE);
     }
 
     // Update the last send time
@@ -232,4 +230,3 @@ void loop()
   /* =========================================================================== */
 }
 
-// 3 purple, 2 red, 1 yellow
