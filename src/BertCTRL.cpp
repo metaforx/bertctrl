@@ -21,7 +21,7 @@ SYSTEM_THREAD(ENABLED);
 
 /* ======================= API publication ====================================== */
 unsigned long lastSendTime = 0;
-const unsigned long sendInterval = 10000; // 60000 * 15; // 15 minutes in milliseconds
+const unsigned long sendInterval = 60000 * 5; // 5 minutes in milliseconds
 /* ============================================================================== */
 
 /* ======================= DS18B20 ============================================== */
@@ -220,7 +220,7 @@ void loop()
       Serial.println(data);
 
       // Publish the JSON string for the webhook
-      // Particle.publish("jardin-data", data, PRIVATE);
+      Particle.publish("jardin-data", data, PRIVATE);
     }
 
     // Update the last send time
