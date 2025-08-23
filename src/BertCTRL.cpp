@@ -51,15 +51,10 @@ struct TimeInterval {
 
 // Define on/off intervals for each channel
 // Note: divide time packages when stepping over midnight, eg. {{23, 0, 23, 59}, {0, 0, 10, 59}}
-// std::vector<TimeInterval> relayTimes[3] = {
-//     {{9, 30, 11, 30}, {13, 30, 14, 30}, {17, 30, 18, 30}},
-//     {{7, 30, 20, 30}},
-//     {{7, 30, 20, 30}}
-// };
 std::vector<TimeInterval> relayTimes[3] = {
-    {{19, 3, 19, 5}, {19, 7, 19, 9}, {19, 11, 19, 13}},
-    {{19, 0, 19, 15}},
-    {{19, 0, 19, 15}}
+    {{9, 30, 11, 30}, {13, 30, 14, 30}, {17, 30, 18, 30}},
+    {{7, 30, 20, 30}},
+    {{7, 30, 20, 30}}
 };
 /* =========================================================================== */
 
@@ -69,7 +64,7 @@ std::vector<TimeInterval> relayTimes[3] = {
 // 1 red
 // 2 purple
 const float TEMP_THRESHOLD_HEATLAMP_HIGH = 50.0;  // High temperature threshold of heatlamp sensor
-const float TEMP_THRESHOLD_SHADOW_HIGH = 25.0;   // High temperature threshold of shadow sensor
+const float TEMP_THRESHOLD_SHADOW_HIGH = 28.0;   // High temperature threshold of shadow sensor
 const float TEMP_THRESHOLD_SHADOW_LOW = 17.0;   // Low temperature threshold of shadow sensor
 
 // sensor assignments
