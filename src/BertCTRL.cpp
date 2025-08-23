@@ -4,7 +4,6 @@
 #include "I2CScanner.h"
 #include "wifi_creds.h"
 #include "SetupWifi.h"
-#include "BertUtils.h" // can most likely be removed later
 #include "OneWire.h"
 #include "spark-dallas-temperature.h"
 #include <multi_channel_relay.h>
