@@ -34,7 +34,13 @@ float tempC;
 
 /* ======================= Relays ============================================== */
 Multi_Channel_Relay relay;
+// 2 red
+// 3 purple
+// 4 green
 const int ACTIVE_CHANNELS[] = {2,3,4};
+// Relay channel assignments
+const int CHANNEL_HEATLAMP = 2; // Channel for the heatlamp (red)
+
 // Define the TimeInterval struct
 struct TimeInterval {
     int startHour;
@@ -45,10 +51,15 @@ struct TimeInterval {
 
 // Define on/off intervals for each channel
 // Note: divide time packages when stepping over midnight, eg. {{23, 0, 23, 59}, {0, 0, 10, 59}}
+// std::vector<TimeInterval> relayTimes[3] = {
+//     {{9, 30, 11, 30}, {13, 30, 14, 30}, {17, 30, 18, 30}},
+//     {{7, 30, 20, 30}},
+//     {{7, 30, 20, 30}}
+// };
 std::vector<TimeInterval> relayTimes[3] = {
-    {{12, 25, 13, 55}, {12, 55, 13, 59}},
-    {{12, 25, 13, 55}},
-    {{12, 25, 13, 55}}
+    {{19, 3, 19, 5}, {19, 7, 19, 9}, {19, 11, 19, 13}},
+    {{19, 0, 19, 15}},
+    {{19, 0, 19, 15}}
 };
 /* =========================================================================== */
 
@@ -65,8 +76,7 @@ const float TEMP_THRESHOLD_SHADOW_LOW = 17.0;   // Low temperature threshold of 
 const int TEMP_SENSOR_SHADOW = 0; // Index of the low temperature sensor  [yellow]
 const int TEMP_SENSOR_HEATLAMP = 1; // Index of the high temperature sensor [red]
 
-// Relay channel assignments
-const int CHANNEL_HEATLAMP = 2; // Channel for the heatlamp
+
 /* ============================================================================ */
 
 
