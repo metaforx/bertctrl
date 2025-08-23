@@ -44,15 +44,19 @@ struct TimeInterval {
 };
 
 // Define on/off intervals for each channel
+// Note: divide time packages when stepping over midnight, eg. {{23, 0, 23, 59}, {0, 0, 10, 59}}
 std::vector<TimeInterval> relayTimes[3] = {
-    {{12, 25, 13, 55}, {12, 55, 13, 59}}, // Note: divide packages when steppig over midnight
+    {{12, 25, 13, 55}, {12, 55, 13, 59}},
     {{12, 25, 13, 55}},
     {{12, 25, 13, 55}}
 };
 /* =========================================================================== */
 
 /* ======================= Temperature Thresholds ============================ */
-// 3 purple, 2 red, 1 yellow
+// Channels per color:
+// 1 yellow
+// 2 red
+// 3 purple
 const float TEMP_THRESHOLD_HIGH = 28.0;  // High temperature threshold
 const float TEMP_THRESHOLD_LOW = 18.0;   // Low temperature threshold
 const int TEMP_SENSOR_LOW = 0; // Index of the low temperature sensor
