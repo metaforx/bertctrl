@@ -127,10 +127,13 @@ void setup()
   }
   /* =========================================================================== */
 
-  /* ======================= Multi Channel Relay Test =============================== */
+  /* ======================= Timezone Setup ==================================== */
+  Time.zone(+2);
+  /* =========================================================================== */
+
+  /* ======================= Multi Channel Relay Setup & Test ================== */
   // Set I2C address and start relay
   relay.begin(RELAY_ADDRESS);
-  Time.zone(+2);
 
   /* Begin Controlling Relay */
   if (TEST_RELAYS_ON_SETUP) {
