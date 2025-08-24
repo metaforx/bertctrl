@@ -192,7 +192,7 @@ void loop()
   int currentMinutes = currentHour * 60 + currentMinute;
 
   tempSensors.requestTemperatures();
-  char data[128];
+  char data[256];
   String deviceId = Particle.deviceID();
 
   Serial.printlnf("Current time: %d:%d", currentHour, currentMinute);
@@ -237,14 +237,15 @@ void loop()
     for (int i = 0; i < tempSensors.getDeviceCount(); i++)
     {
       tempC = tempSensors.getTempCByIndex(i);
+      char sensorId[64];
+      snprintf(sensorId, sizeof(sensorId), "%s-%d-%s", deviceId.c_str(), i, SENSOR_COLORS[i]);
 
       // Prepare JSON payload as a string
       snprintf(data, sizeof(data),
-          "{\"value\":%.2f,\"sensor_id\":\"%s-%d-%s\",\"sensor_name\":\"%s\",\"sensor_type\":\"%s\"}",
+          "{\"value\":%.2f,\"device_id\":\"%s\",\"sensor_id\":\"%s\",\"sensor_name\":\"%s\",\"sensor_type\":\"%s\"}",
           tempC,
-          deviceId.c_str(), 
-          i,                
-          SENSOR_COLORS[i],
+          deviceId.c_str(),
+          sensorId,
           "bertctl",
           "temperature"
       );
