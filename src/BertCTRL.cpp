@@ -33,10 +33,11 @@ float tempC;
 /* ============================================================================== */
 
 /* ======================= Relays ============================================== */
-Multi_Channel_Relay relay;
 // 2 red
 // 3 purple
 // 4 green
+Multi_Channel_Relay relay;
+const bool TEST_RELAYS_ON_SETUP = true;
 const int ACTIVE_CHANNELS[] = {2,3,4};
 // Relay channel assignments
 const int CHANNEL_HEATLAMP = 2; // Channel for the heatlamp (red)
@@ -63,6 +64,7 @@ std::vector<TimeInterval> relayTimes[3] = {
 // 0 yellow
 // 1 red
 // 2 purple
+const char* SENSOR_COLORS[] = {"yellow", "red", "purple"};
 const float TEMP_THRESHOLD_HEATLAMP_HIGH = 50.0;  // High temperature threshold of heatlamp sensor
 const float TEMP_THRESHOLD_SHADOW_HIGH = 28.0;   // High temperature threshold of shadow sensor
 const float TEMP_THRESHOLD_SHADOW_LOW = 17.0;   // Low temperature threshold of shadow sensor
@@ -131,49 +133,52 @@ void setup()
   Time.zone(+2);
 
   /* Begin Controlling Relay */
-  DEBUG_PRINT.println("Channel 1 on");
-  relay.turn_on_channel(1);
-  delay(500);
-  DEBUG_PRINT.println("Channel 2 on");
-  relay.turn_off_channel(1);
-  relay.turn_on_channel(2);
-  delay(500);
-  DEBUG_PRINT.println("Channel 3 on");
-  relay.turn_off_channel(2);
-  relay.turn_on_channel(3);
-  delay(500);
-  DEBUG_PRINT.println("Channel 4 on");
-  relay.turn_off_channel(3);
-  relay.turn_on_channel(4);
-  delay(500);
-  relay.turn_off_channel(4);
+  if (TEST_RELAYS_ON_SETUP) {
+    DEBUG_PRINT.println("Channel 1 on");
+    relay.turn_on_channel(1);
+    delay(500);
+    DEBUG_PRINT.println("Channel 2 on");
+    relay.turn_off_channel(1);
 
-  relay.channelCtrl(CHANNLE1_BIT |
-                    CHANNLE2_BIT |
-                    CHANNLE3_BIT |
-                    CHANNLE4_BIT);
-  DEBUG_PRINT.print("Turn all channels on, State: ");
-  DEBUG_PRINT.println(relay.getChannelState(), BIN);
+    relay.turn_on_channel(2);
+    delay(500);
+    DEBUG_PRINT.println("Channel 3 on");
+    relay.turn_off_channel(2);
+    relay.turn_on_channel(3);
+    delay(500);
+    DEBUG_PRINT.println("Channel 4 on");
+    relay.turn_off_channel(3);
+    relay.turn_on_channel(4);
+    delay(500);
+    relay.turn_off_channel(4);
 
-  delay(2000);
+    relay.channelCtrl(CHANNLE1_BIT |
+                      CHANNLE2_BIT |
+                      CHANNLE3_BIT |
+                      CHANNLE4_BIT);
+    DEBUG_PRINT.print("Turn all channels on, State: ");
+    DEBUG_PRINT.println(relay.getChannelState(), BIN);
 
-  relay.channelCtrl(CHANNLE1_BIT |
-                    CHANNLE3_BIT);
-  DEBUG_PRINT.print("Turn 1 3 channels on, State: ");
-  DEBUG_PRINT.println(relay.getChannelState(), BIN);
+    delay(2000);
 
-  delay(2000);
+    relay.channelCtrl(CHANNLE1_BIT |
+                      CHANNLE3_BIT);
+    DEBUG_PRINT.print("Turn 1 3 channels on, State: ");
+    DEBUG_PRINT.println(relay.getChannelState(), BIN);
 
-  relay.channelCtrl(CHANNLE2_BIT |
-                    CHANNLE4_BIT);
-  DEBUG_PRINT.print("Turn 2 4 channels on, State: ");
-  DEBUG_PRINT.println(relay.getChannelState(), BIN);
+    delay(2000);
 
-  delay(2000);
+    relay.channelCtrl(CHANNLE2_BIT |
+                      CHANNLE4_BIT);
+    DEBUG_PRINT.print("Turn 2 4 channels on, State: ");
+    DEBUG_PRINT.println(relay.getChannelState(), BIN);
 
-  relay.channelCtrl(0);
-  DEBUG_PRINT.print("Turn off all channels, State: ");
-  DEBUG_PRINT.println(relay.getChannelState(), BIN);
+    delay(2000);
+
+    relay.channelCtrl(0);
+    DEBUG_PRINT.print("Turn off all channels, State: ");
+    DEBUG_PRINT.println(relay.getChannelState(), BIN);
+  }
   /* =========================================================================== */
 }
 
@@ -229,15 +234,16 @@ void loop()
     for (int i = 0; i < tempSensors.getDeviceCount(); i++)
     {
       tempC = tempSensors.getTempCByIndex(i);
-      Serial.println(tempC);
 
       // Prepare JSON payload as a string
       snprintf(data, sizeof(data),
-        "{\"value\":%.2f,\"sensor_id\":\"%s\",\"sensor_name\":\"%s\",\"sensor_type\":\"%s\"}",
-        tempC,
-        deviceId.c_str(), 
-        "bertctl",  
-        "temperature"  
+          "{\"value\":%.2f,\"sensor_id\":\"%s-%d-%s\",\"sensor_name\":\"%s\",\"sensor_type\":\"%s\"}",
+          tempC,
+          deviceId.c_str(), 
+          i,                
+          SENSOR_COLORS[i],
+          "bertctl",
+          "temperature"
       );
 
       // // Log the payload to serial
