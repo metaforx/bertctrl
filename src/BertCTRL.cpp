@@ -33,11 +33,11 @@ float tempC;
 /* ============================================================================== */
 
 /* ======================= Relays ============================================== */
-// 2 red
-// 3 purple
-// 4 green
+// 2 red -> heatlamp
+// 3 purple -> uvb light
+// 4 green -> neon light
 Multi_Channel_Relay relay;
-const bool TEST_RELAYS_ON_SETUP = true;
+const bool TEST_RELAYS_ON_SETUP = false;
 const int ACTIVE_CHANNELS[] = {2,3,4};
 // Relay channel assignments
 const int CHANNEL_HEATLAMP = 2; // Channel for the heatlamp (red)
@@ -53,9 +53,9 @@ struct TimeInterval {
 // Define on/off intervals for each channel
 // Note: divide time packages when stepping over midnight, eg. {{23, 0, 23, 59}, {0, 0, 10, 59}}
 std::vector<TimeInterval> relayTimes[3] = {
-    {{9, 30, 11, 30}, {13, 30, 14, 30}, {17, 30, 18, 30}},
-    {{7, 30, 20, 30}},
-    {{7, 30, 20, 30}}
+    {{9, 0, 12, 0}, {13, 0, 17, 0}, {18, 0, 20, 0}}, //heatlamp
+    {{9, 0, 20, 30}}, //uvb light 
+    {{9, 0, 20, 30}}, //neon light
 };
 /* =========================================================================== */
 
@@ -65,13 +65,19 @@ std::vector<TimeInterval> relayTimes[3] = {
 // 1 red
 // 2 purple
 const char* SENSOR_COLORS[] = {"yellow", "red", "purple"};
-const float TEMP_THRESHOLD_HEATLAMP_HIGH = 50.0;  // High temperature threshold of heatlamp sensor
-const float TEMP_THRESHOLD_SHADOW_HIGH = 28.0;   // High temperature threshold of shadow sensor
-const float TEMP_THRESHOLD_SHADOW_LOW = 17.0;   // Low temperature threshold of shadow sensor
+const float SHADOW_SENSOR_OFFSET_C = 2.5;             // Shadow sensor reads hotter than far-edge ambient
+const float TEMP_THRESHOLD_SHADOW_ON = 27.0;           // Turn on heatlamp below this shadow temp
+const float TEMP_THRESHOLD_SHADOW_OFF = 29.0;          // Turn off heatlamp above this shadow temp
+const float TEMP_THRESHOLD_SHADOW_SAFETY_HIGH = 31.0;  // Safety cutoff for adjusted shadow temp
+const float TEMP_THRESHOLD_HEATLAMP_SAFETY_HIGH = 45.0; // Safety cutoff for heatlamp-area sensor
+const float TEMP_THRESHOLD_HEATLAMP_REENABLE = 43.0;    // Re-enable heatlamp only below this value
+const unsigned long HEATLAMP_LOCKOUT_MS = 15UL * 60UL * 1000UL; // 15 minutes
 
 // sensor assignments
 const int TEMP_SENSOR_SHADOW = 0; // Index of the low temperature sensor  [yellow]
 const int TEMP_SENSOR_HEATLAMP = 1; // Index of the high temperature sensor [red]
+bool heatLampWasOn = false;
+unsigned long heatLampLockoutUntil = 0;
 
 
 /* ============================================================================ */
@@ -128,7 +134,7 @@ void setup()
   /* =========================================================================== */
 
   /* ======================= Timezone Setup ==================================== */
-  Time.zone(+2);
+  Time.zone(+1);
   /* =========================================================================== */
 
   /* ======================= Multi Channel Relay Setup & Test ================== */
@@ -201,33 +207,51 @@ void loop()
   // Iterate through each active channel
   for (size_t i = 0; i < sizeof(ACTIVE_CHANNELS) / sizeof(ACTIVE_CHANNELS[0]); i++) {
     int channel = ACTIVE_CHANNELS[i]; // Get the current channel
-    bool channelOn = false;
-    
-    // Check each time interval for the current channel
+    bool inSchedule = false;
+
+    // Check each time interval for the current channel.
     for (const auto& timeSlot : relayTimes[i]) {
-
-      //check times slotes per channel
+      // Channel is allowed only when current time falls inside one configured slot.
       if (isTimeBetween(currentMinutes, timeSlot.startHour, timeSlot.startMinute, timeSlot.endHour, timeSlot.endMinute)) {
-
-        // check temperature confditions only for heat lamp
-        if (channel == CHANNEL_HEATLAMP)  {
-
-          // Check if the shadow sensor is above the low threshold, otherwise turn the lamp on
-          if (tempSensors.getTempCByIndex(TEMP_SENSOR_SHADOW) > TEMP_THRESHOLD_SHADOW_LOW) {
-
-            //if the temperature is above the high threshold (either of shadow or heat lamp), turn off the lamp
-            if ((tempSensors.getTempCByIndex(TEMP_SENSOR_HEATLAMP) > TEMP_THRESHOLD_HEATLAMP_HIGH) ||
-                (tempSensors.getTempCByIndex(TEMP_SENSOR_SHADOW) > TEMP_THRESHOLD_SHADOW_HIGH)) {
-              channelOn = false; // Turn off the channel if temperature is out of bounds
-              break;
-            }
-          }
-        }
-        channelOn = true;
+        inSchedule = true;
         break;
       }
     }
+
+    bool channelOn = inSchedule;
+
+    // Keep timing intact: temperature logic applies only while heatlamp is in an active time slot.
+    if (channel == CHANNEL_HEATLAMP && inSchedule) {
+      float shadowTemp = tempSensors.getTempCByIndex(TEMP_SENSOR_SHADOW) - SHADOW_SENSOR_OFFSET_C;
+      float heatLampTemp = tempSensors.getTempCByIndex(TEMP_SENSOR_HEATLAMP);
+      // Trip safety when either heatlamp probe or corrected shadow probe is too hot.
+      bool safetyTrip = (heatLampTemp >= TEMP_THRESHOLD_HEATLAMP_SAFETY_HIGH) ||
+                        (shadowTemp >= TEMP_THRESHOLD_SHADOW_SAFETY_HIGH);
+      // Lockout is active until the saved timestamp has passed.
+      bool lockoutActive = static_cast<long>(millis() - heatLampLockoutUntil) < 0;
+
+      // Force OFF and start a 15-minute cooldown when safety limits are exceeded.
+      if (safetyTrip) {
+        channelOn = false;
+        heatLampLockoutUntil = millis() + HEATLAMP_LOCKOUT_MS;
+      // Keep OFF during the cooldown window after a safety trip.
+      } else if (lockoutActive) {
+        channelOn = false;
+      // If already ON, keep ON until corrected shadow temperature reaches the OFF threshold.
+      } else if (heatLampWasOn) {
+        // Hysteresis band: once on, stay on until the upper shadow threshold is reached.
+        channelOn = shadowTemp < TEMP_THRESHOLD_SHADOW_OFF;
+      } else {
+        // If currently OFF, turn ON only when corrected shadow is cool enough and heatlamp area is cooled.
+        channelOn = (shadowTemp <= TEMP_THRESHOLD_SHADOW_ON) &&
+                    (heatLampTemp <= TEMP_THRESHOLD_HEATLAMP_REENABLE);
+      }
+    }
+
     channelOn ? relay.turn_on_channel(channel) : relay.turn_off_channel(channel);
+    if (channel == CHANNEL_HEATLAMP) {
+      heatLampWasOn = channelOn;
+    }
   }
 
   /* ======================= SEND DATA =================================== */
@@ -263,4 +287,3 @@ void loop()
   }
   /* =========================================================================== */
 }
-
